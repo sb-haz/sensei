@@ -36,13 +36,13 @@ export default async function TemplatesList() {
 
                     <div className="flex gap-2">
                         <Link
-                            href={`/dashboard/interview?template=${template.id}`}
+                            href={`/interview?template=${template.id}`}
                             className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors text-center"
                         >
                             Start Interview
                         </Link>
                         <Link
-                            href={`/dashboard/interview?template=${template.id}&modify=true`}
+                            href={`/interview?template=${template.id}&modify=true`}
                             className="flex-1 border border-gray-300 text-gray-700 py-2 px-4 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors text-center"
                         >
                             Modify

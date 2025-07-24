@@ -19,7 +19,7 @@ export default async function Dashboard() {
                     <p className="text-gray-600 mt-2">Practice with AI-powered interview sessions</p>
                 </div>
                 <Link
-                    href="/dashboard/interview/new"
+                    href="/interview"
                     className="bg-green-600 text-white px-6 py-3 rounded-md font-medium hover:bg-green-700 transition-colors"
                 >
                     New Custom Interview
