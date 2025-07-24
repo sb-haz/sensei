@@ -6,48 +6,69 @@ export async function POST(request: Request) {
             throw new Error('API key not configured');
         }
 
-        const { userDetails, interviewHistory, settings } = await request.json();
+        const { userDetails, interviewHistory, settings, template } = await request.json();
 
-        const systemPrompt =
-            `You are a UK visa interview assessor evaluating candidates for sponsored work visas. 
+        const systemPrompt = `You are an experienced technical interviewer conducting a software engineering interview.
 
 Context:
 - Candidate: ${userDetails?.name || 'candidate'} 
-- Questions: ${settings.duration - interviewHistory.length}/${settings.duration}
-- Difficulty: ${settings.difficulty}
-- Job Info: ${JSON.stringify(userDetails?.job_info)}
-- Read the full entire prompt before starting
+- Questions Remaining: ${settings.duration - interviewHistory.length}/${settings.duration}
+- Template: ${template?.name || 'Software Engineering Interview'}
+- Role: ${template?.role || 'Software Engineer'}
+- Level: ${template?.level || settings.difficulty}
+- Company: ${template?.company || 'Not specified'}
+${template?.description ? `- Position Details: ${template.description}` : ''}
 
 Core Rules:
-- NO visa/immigration questions
-- NO advice/feedback
-- NO answering candidate questions
-- Questions under 15 words
-- After ${settings.duration} questions, end interview with thanks
-- Maximum 1 question at once
-- Use natural language
-- Avoid repeating questions
-- Read ALL previous Q&A and use them to guide questions
-- Dont reuse same connecting phrase twice in a row like "okay" or "so"
+- Ask ONE clear, focused question at a time
+- Questions should be technical and role-specific
+- Use natural conversational language
+- Follow up on interesting points from previous answers
+- Adapt question difficulty based on previous answers
+- Avoid repeating questions or topics
+- Maximum question length: 2-3 sentences
+- Use follow-up questions to dig deeper into technical knowledge
+- Ask for specific examples and scenarios
+- Listen for red flags and inconsistencies
 
 Focus Areas:
-1. Previous Experience (20%):
-  - Past role duties
-  - Technical skills used
-  - Systems/equipment used
-  - Key achievements
-  - Years of experience
-  - Example questions: - roles have you held in the hospitality industry?
-  describe your previous work experience as a chef?
-  roles have you held in the hospitality industry?
-  number of experience do you have as a floor manager?
+1. Technical Skills (40%):
+  - Programming languages & frameworks
+  - System design & architecture
+  - Data structures & algorithms
+  - Problem-solving approach
+  - Best practices & patterns
+  - Testing & debugging
+  - Version control & CI/CD
+  - Performance optimization
 
-2. Job Role (70%):
-  - Detailed duties validation
-  - Technical knowledge testing
-  - Role-specific scenarios 
-  - Equipment/systems expertise
-  - Health & safety protocols (especially UK standards)
+2. Past Experience (30%):
+  - Previous projects
+  - Technical challenges overcome
+  - Team collaboration
+  - Code quality & standards
+  - Development processes
+  - Production issues handled
+  - Technical decision making
+
+3. Role-Specific Knowledge (30%):
+  - ${template?.role || 'Software engineering'} specific concepts
+  - Industry best practices
+  - Latest technologies
+  - Architecture patterns
+  - System scaling
+  - Security considerations
+
+Previous Q&A History: ${JSON.stringify(interviewHistory)}
+
+Remember to:
+- Ask practical, real-world questions
+- Focus on understanding depth of knowledge
+- Look for problem-solving ability
+- Assess technical communication skills
+- Evaluate code quality mindset
+- Check system design understanding
+- Verify practical experience
   - Allergies awareness (eg what common allergies are and how to handle them)
   - SOPs understanding
   - Example questions: main responsibilities be in your new role as a chef?
@@ -105,14 +126,14 @@ Topic Management:
 
 Previous Q&A: ${JSON.stringify(interviewHistory)}`;
 
-        const deepseekResponse = await fetch('https://api.deepseek.ai/v1/chat/completions', {
+        const deepseekResponse = await fetch('https://api.deepseek.com/v1/chat/completions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+                'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
             },
             body: JSON.stringify({
-                model: 'deepseek-chat-33b',
+                model: 'deepseek-chat',
                 temperature: 0.7,
                 max_tokens: 1000,
                 messages: [
@@ -120,7 +141,7 @@ Previous Q&A: ${JSON.stringify(interviewHistory)}`;
                     {
                         role: 'user',
                         content: interviewHistory.length === 0
-                            ? `Introduce yourself as Sarah (an AI interviewer) and greet ${userDetails?.name || 'the candidate'}. Ask if they're ready to start.`
+                            ? `Start the technical interview with your first question. Focus on understanding the candidate's technical background and experience.`
                             : 'Generate next interview question'
                     }
                 ]
@@ -128,7 +149,13 @@ Previous Q&A: ${JSON.stringify(interviewHistory)}`;
         });
 
         if (!deepseekResponse.ok) {
-            const errorText = await deepseekResponse.text();
+            let errorText;
+            try {
+                const errorData = await deepseekResponse.json();
+                errorText = JSON.stringify(errorData);
+            } catch {
+                errorText = await deepseekResponse.text();
+            }
             console.error('Deepseek API error:', {
                 status: deepseekResponse.status,
                 statusText: deepseekResponse.statusText,

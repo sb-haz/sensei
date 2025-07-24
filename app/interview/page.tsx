@@ -7,6 +7,19 @@ import ControlPanel from './components/ControlPanel';
 import QuestionAnswerBox from './components/QuestionAnswerBox';
 import InterviewHeader from './components/InterviewHeader';
 import { createTranscriptionService } from './services/transcription';
+import { createClient } from '@/lib/supabase/client';
+
+interface Template {
+    id: string;
+    name: string;
+    role: string;
+    level: string;
+    difficulty: 'easy' | 'medium' | 'hard';
+    company?: string;
+    description?: string;
+    duration_minutes: number;
+    number_of_questions: number;
+}
 
 interface Interview {
     questions: { question: string; answer: string; }[];
@@ -35,6 +48,7 @@ export default function InterviewPage() {
     const [currentQuestion, setCurrentQuestion] = useState('');
     const [showEndConfirm, setShowEndConfirm] = useState(false);
     const [isInterviewerSpeaking, setIsInterviewerSpeaking] = useState(false);
+    const [template, setTemplate] = useState<Template | null>(null);
     const [interview, setInterview] = useState<Interview>({
         questions: [],
         settings: {
@@ -77,28 +91,69 @@ export default function InterviewPage() {
         return () => clearInterval(timer);
     }, [interview.startTime]);
 
+    // Load template data
+    useEffect(() => {
+        const loadTemplate = async () => {
+            const params = new URLSearchParams(window.location.search);
+            const templateId = params.get('template');
+            
+            if (templateId) {
+                const supabase = createClient();
+                const { data: templateData } = await supabase
+                    .from('interview_templates')
+                    .select('*')
+                    .eq('id', templateId)
+                    .single();
+
+                if (templateData) {
+                    setTemplate(templateData);
+                    // Update interview settings based on template
+                    setInterview(prev => ({
+                        ...prev,
+                        settings: {
+                            difficulty: templateData.difficulty,
+                            duration: templateData.number_of_questions
+                        }
+                    }));
+                }
+            }
+        };
+
+        loadTemplate();
+    }, []);
+
     // Set up media devices
     useEffect(() => {
         const setupMedia = async () => {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: true,
-                    audio: true
-                });
-                if (videoRef.current) {
-                    videoRef.current.srcObject = stream;
-                    videoRef.current.muted = true;
+                // Try to get both video and audio, but don't fail if they're not available
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: true,
+                        audio: true
+                    });
+                    if (videoRef.current) {
+                        videoRef.current.srcObject = stream;
+                        videoRef.current.muted = true;
+                    }
+                    setStream(stream);
+                    setIsMicEnabled(true);
+                    setIsCameraEnabled(true);
+                } catch (mediaError) {
+                    console.log('Media devices not available:', mediaError);
+                    // Try audio only if both failed
+                    try {
+                        const audioStream = await navigator.mediaDevices.getUserMedia({
+                            audio: true
+                        });
+                        setStream(audioStream);
+                        setIsMicEnabled(true);
+                    } catch (audioError) {
+                        console.log('Audio not available:', audioError);
+                    }
                 }
-                setStream(stream);
-                setIsMicEnabled(true);
-                setIsCameraEnabled(true);
-                setShowPermissions(false);
-
-                // Start with first question
-                fetchNextQuestion();
             } catch (err) {
-                console.error('Failed to access camera/microphone:', err);
-                setShowPermissions(false);
+                console.error('Failed to setup interview:', err);
             }
         };
 
@@ -157,11 +212,14 @@ export default function InterviewPage() {
     const fetchNextQuestion = async () => {
         if (interview.questions.length >= interview.settings.duration) {
             await handleEndInterview();
-            return;
+            return true;
         }
 
+        setCurrentQuestion(''); // Clear current question while loading
+        setAnswer(''); // Clear previous answer
+        setLoading(true);
+
         try {
-            setLoading(true);
             console.log('Fetching next question...', {
                 questionCount: interview.questions.length,
                 settings: interview.settings
@@ -176,13 +234,14 @@ export default function InterviewPage() {
                     userDetails: {
                         name: 'Test User', // TODO: Replace with actual user details
                         job_info: {
-                            title: 'Chef',
+                            title: template?.role || 'Software Engineer',
                             experience: '5 years',
-                            sector: 'Hospitality'
+                            sector: 'Technology'
                         }
                     },
                     interviewHistory: interview.questions,
-                    settings: interview.settings
+                    settings: interview.settings,
+                    template: template
                 }),
             });
 
@@ -214,10 +273,32 @@ export default function InterviewPage() {
             }
 
             console.log('Successfully fetched question:', data.question);
+            
+            // Read out the question using text-to-speech
+            setIsInterviewerSpeaking(true);
+            const utterance = new SpeechSynthesisUtterance(data.question);
+            // Make sure any previous speech is cancelled
+            window.speechSynthesis.cancel();
+            utterance.onend = () => setIsInterviewerSpeaking(false);
+            window.speechSynthesis.speak(utterance);
+            
+            // Set the question after starting speech synthesis
             setCurrentQuestion(data.question);
             setAnswer('');
+            
+            // Wait a moment to ensure state is updated
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // Verify the question was set
+            if (data.question) {
+                return true;
+            } else {
+                throw new Error('Question was not set properly');
+            }
         } catch (error) {
             console.error('Failed to get next question:', error);
+            setCurrentQuestion('Error: Failed to load question. Please try again.');
+            return false;
         } finally {
             setLoading(false);
         }
@@ -232,16 +313,23 @@ export default function InterviewPage() {
         setIsRecording(false);
 
         try {
+            // First update the interview state with the new Q&A
             const newQuestions = [...interview.questions, {
                 question: currentQuestion,
                 answer: answer.trim()
             }];
 
+            // Update interview state first
             setInterview(prev => ({
                 ...prev,
                 questions: newQuestions
             }));
 
+            // Clear current state before fetching next question
+            setCurrentQuestion('');
+            setAnswer('');
+
+            // Then fetch the next question
             await fetchNextQuestion();
         } catch (error) {
             console.error('Failed to save answer:', error);
@@ -299,14 +387,35 @@ export default function InterviewPage() {
             <div className="min-h-screen bg-gray-900 flex items-center justify-center">
                 <div className="bg-white p-8 rounded-lg max-w-md">
                     <h2 className="text-2xl font-bold mb-4 text-center">Setup Your Interview</h2>
+                    <h3 className="text-lg text-center mb-2">Welcome to your technical interview!</h3>
                     <p className="text-gray-600 mb-6">
-                        Please allow access to your camera and microphone to start the interview.
+                        Allow access to your camera and microphone if available. You can proceed with the interview even without these devices.
+                    </p>
+                    <p className="text-sm text-gray-500 mb-4">
+                        {template ? `Interview type: ${template.name} - ${template.role} (${template.level})` : 'Standard Software Engineering Interview'}
                     </p>
                     <button
-                        onClick={() => setShowPermissions(false)}
-                        className="w-full bg-blue-600 text-white py-3 rounded-md font-medium hover:bg-blue-700 transition-colors"
+                        onClick={async () => {
+                            try {
+                                setLoading(true);
+                                const result = await fetchNextQuestion();
+                                if (result) {
+                                    setShowPermissions(false);
+                                } else {
+                                    throw new Error('Failed to load first question');
+                                }
+                            } catch (error) {
+                                console.error('Failed to start interview:', error);
+                                // Show error message
+                                setCurrentQuestion('Error starting interview. Please try again.');
+                            } finally {
+                                setLoading(false);
+                            }
+                        }}
+                        disabled={loading}
+                        className="w-full bg-blue-600 text-white py-3 rounded-md font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
                     >
-                        Continue
+                        {loading ? 'Starting Interview...' : 'Continue'}
                     </button>
                 </div>
             </div>
