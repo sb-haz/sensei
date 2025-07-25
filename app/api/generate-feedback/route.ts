@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/client';
+import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: Request) {
     try {
@@ -11,64 +11,45 @@ export async function POST(request: Request) {
         }
 
         // Parse the request body
-        const { userDetails, interviewHistory, settings, interviewId } = await request.json();
+        const { userDetails, interviewHistory, template, interviewId, isEndOfInterview } = await request.json();
 
         // Debugging: Log the request body
         console.log('Request Body:', {
             userDetails,
             interviewHistory,
-            settings,
-            interviewId
+            template,
+            interviewId,
+            isEndOfInterview
         });
 
         // System prompt for generating feedback
-        const systemPrompt = `
-You are a UK visa interview assessor evaluating candidates for sponsored work visas. 
+        const systemPrompt = `You are a technical interview assessor providing comprehensive feedback.
 
 Context:
 - Candidate: ${userDetails?.name || 'candidate'}
-- Job Info: ${JSON.stringify(userDetails?.job_info)}
-- Difficulty: ${settings.difficulty}
-- Transcript: ${JSON.stringify(interviewHistory)}
+- Role: ${template?.role || 'Software Engineer'}
+- Level: ${template?.level || 'Mid-level'}
+- Company: ${template?.company || 'Tech Company'}
 
-Core Rules:
-- Provide detailed feedback for each question and answer.
-- Grade the candidate's responses on a scale of 1 to 10.
-- Highlight strengths and areas for improvement.
-- Be constructive and professional.
+COMPLETE INTERVIEW ASSESSMENT
+Interview History: ${JSON.stringify(interviewHistory)}
 
-Feedback Format:
-You MUST return the feedback as a valid JSON object with the following structure:
+Provide comprehensive feedback for the entire interview in the following JSON format:
 {
-    "feedback": [
-        {
-            "question": "What are your main responsibilities in your new role?",
-            "answer": "I will be managing the kitchen and ensuring food quality.",
-            "feedback": {
-                "score": 7,
-                "strengths": "Clear understanding of the role.",
-                "areas_for_improvement": "Could provide more specific examples of responsibilities.",
-                "suggestions": "Mention specific tasks like menu planning, staff training, and inventory management."
-            }
-        }
-    ],
-    "overall_feedback": {
-        "strengths": "The candidate demonstrated good understanding of their role.",
-        "areas_for_improvement": "Responses could include more specific examples.",
-        "suggestions": [
-            "Practice describing specific tasks and responsibilities in detail.",
-            "Focus on technical aspects of the role",
-            "Use professional terminology when possible"
-        ],
-        "final_score": 7
-    }
+    "overall_score": [number 1-100],
+    "feedback_summary": "[2-3 sentence overall assessment]",
+    "strengths": ["strength1", "strength2", "strength3"],
+    "improvements": ["improvement1", "improvement2", "improvement3"],
+    "detailed_analysis": {
+        "technical_skills": "[assessment of technical abilities]",
+        "communication": "[assessment of communication skills]",
+        "problem_solving": "[assessment of problem-solving approach]",
+        "interview_performance": "[overall interview performance notes]"
+    },
+    "recommendations": "[specific advice for improvement]"
 }
 
-Important Notes:
-1. The response MUST be a valid JSON object.
-2. Do not include any additional text or explanations outside the JSON object.
-3. Ensure all keys and values are properly quoted and formatted.
-`;
+Focus on providing actionable, constructive feedback that helps the candidate improve.`;
 
         // Call the Deepseek API to generate feedback
         const deepseekResponse = await fetch('https://api.deepseek.com/v1/chat/completions', {
@@ -79,11 +60,13 @@ Important Notes:
             },
             body: JSON.stringify({
                 model: 'deepseek-chat',
+                temperature: 0.3, // Lower temperature for more consistent JSON output
+                max_tokens: 2000,
                 messages: [
                     { role: 'system', content: systemPrompt },
                     {
                         role: 'user',
-                        content: 'Generate feedback for the interview transcript. Return ONLY a valid JSON object.'
+                        content: 'Generate feedback for the interview transcript. Return ONLY a valid JSON object with no additional text or explanations.'
                     }
                 ]
             })
@@ -96,33 +79,66 @@ Important Notes:
         const data = await deepseekResponse.json();
         const feedbackText = data.choices[0].message.content;
 
+        console.log('Raw feedback from AI:', feedbackText); // Debug log
+
+        // Try to extract JSON from the response if it contains extra text
+        let cleanedFeedbackText = feedbackText.trim();
+        
+        // Look for JSON object boundaries
+        const jsonStart = cleanedFeedbackText.indexOf('{');
+        const jsonEnd = cleanedFeedbackText.lastIndexOf('}');
+        
+        if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+            cleanedFeedbackText = cleanedFeedbackText.substring(jsonStart, jsonEnd + 1);
+        }
+
         // Parse the feedback as JSON
         let feedback;
         try {
-            feedback = JSON.parse(feedbackText);
+            feedback = JSON.parse(cleanedFeedbackText);
         } catch (error) {
             console.error('Failed to parse feedback as JSON:', error);
+            console.error('Raw feedback text that failed to parse:', feedbackText);
+            console.error('Cleaned feedback text that failed to parse:', cleanedFeedbackText);
             throw new Error('Feedback is not in valid JSON format');
         }
 
         // Validate the feedback structure
-        if (!feedback || !feedback.feedback || !Array.isArray(feedback.feedback)) {
-            throw new Error('Invalid feedback structure');
+        if (!feedback) {
+            throw new Error('No feedback generated');
         }
+
+        console.log('Parsed feedback structure:', feedback); // Debug log
 
         // Initialize the Supabase client
-        const supabase = createClient();
+        const supabase = await createClient();
 
-        // Save the feedback to the database
-        const { error } = await supabase
-            .from('interviews')
-            .update({ feedback: feedback })
-            .eq('id', interviewId);
+        // Save feedback to interviews table
+        if (interviewId) {
+            console.log('Updating interview with comprehensive feedback:', interviewId);
+            
+            const { data: updateResult, error } = await supabase
+                .from('interviews')
+                .update({ 
+                    ai_feedback: feedback,
+                    overall_score: feedback.overall_score || null,
+                    feedback_summary: feedback.feedback_summary || null,
+                    strengths: feedback.strengths || [],
+                    improvements: feedback.improvements || []
+                })
+                .eq('id', interviewId)
+                .select(); // Add select to return updated data
 
-        if (error) {
-            throw new Error(`Failed to save feedback: ${error.message}`);
+            if (error) {
+                console.error('Failed to update interview with feedback:', error);
+                throw new Error(`Database update failed: ${error.message}`);
+            } else {
+                console.log('Successfully updated interview with feedback:', updateResult);
+            }
+        } else {
+            console.log('No interviewId provided, skipping database update');
         }
-
+        
         return NextResponse.json({ feedback });
 
     } catch (error: any) {

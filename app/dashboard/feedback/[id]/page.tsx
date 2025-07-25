@@ -11,28 +11,30 @@ interface InterviewTemplate {
   topic: string;
 }
 
-interface FeedbackItem {
+interface AnswerItem {
   id: number;
+  question_number: number;
   question_text: string;
   user_answer: string;
-  ai_feedback: string;
-  score: number;
-  strengths: string[];
-  improvements: string[];
 }
 
 interface InterviewWithFeedback {
   id: number;
   status: string;
   overall_score: number;
+  ai_feedback: any;
+  feedback_summary: string;
+  strengths: string[];
+  improvements: string[];
   started_at: string;
   completed_at: string;
   total_duration_minutes: number;
   interview_templates: InterviewTemplate | null;
-  feedback: FeedbackItem[];
+  answers: AnswerItem[];
 }
 
-export default async function FeedbackPage({ params }: { params: { id: string } }) {
+export default async function FeedbackPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const supabase = await createClient();
 
   const { data, error } = await supabase.auth.getClaims();
@@ -46,10 +48,14 @@ export default async function FeedbackPage({ params }: { params: { id: string } 
       id,
       status,
       overall_score,
+      ai_feedback,
+      feedback_summary,
+      strengths,
+      improvements,
       started_at,
       completed_at,
       total_duration_minutes,
-      interview_templates:interview_templates!interviews_interview_templates_fkey (
+      interview_templates:template_id (
         name,
         company,
         role,
@@ -57,17 +63,14 @@ export default async function FeedbackPage({ params }: { params: { id: string } 
         difficulty,
         topic
       ),
-      feedback (
+      answers (
         id,
+        question_number,
         question_text,
-        user_answer,
-        ai_feedback,
-        score,
-        strengths,
-        improvements
+        user_answer
       )
     `)
-    .eq("id", params.id)
+    .eq("id", id)
     .single();
 
   if (interviewError || !interview) {
@@ -81,7 +84,7 @@ export default async function FeedbackPage({ params }: { params: { id: string } 
     interview_templates: Array.isArray(interview.interview_templates)
       ? interview.interview_templates[0] || null
       : interview.interview_templates,
-    feedback: interview.feedback || [],
+    answers: interview.answers || [],
   };
 
   const formatDate = (dateString: string) => {
@@ -167,60 +170,77 @@ export default async function FeedbackPage({ params }: { params: { id: string } 
               </div>
               <div>
                 <span className="text-sm font-medium text-gray-500">Questions Answered:</span>
-                <p className="text-gray-900">{typedInterview.feedback?.length || 0}</p>
+                <p className="text-gray-900">{typedInterview.answers?.length || 0}</p>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Detailed Feedback */}
-      <div className="space-y-6">
-        <h2 className="text-2xl font-semibold text-gray-900">Question-by-Question Feedback</h2>
-        {typedInterview.feedback?.map((item, index) => (
-          <div key={item.id} className="bg-white shadow-sm border border-gray-200 rounded-lg p-6">
-            <div className="flex justify-between items-start mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Question {index + 1}</h3>
-              <span className={`px-3 py-1 rounded-full text-sm font-medium ${getScoreColor(item.score)}`}>
-                {item.score}/10
-              </span>
+      {/* Overall Feedback */}
+      {typedInterview.ai_feedback && (
+        <div className="bg-white shadow-sm border border-gray-200 rounded-lg p-6">
+          <h2 className="text-2xl font-semibold text-gray-900 mb-4">Overall Interview Feedback</h2>
+          
+          {typedInterview.feedback_summary && (
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Summary</h3>
+              <p className="text-gray-700">{typedInterview.feedback_summary}</p>
             </div>
+          )}
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Strengths */}
+            {typedInterview.strengths && typedInterview.strengths.length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold text-green-800 mb-3">Strengths</h3>
+                <ul className="space-y-2">
+                  {typedInterview.strengths.map((strength: string, idx: number) => (
+                    <li key={idx} className="flex items-start">
+                      <span className="flex-shrink-0 w-2 h-2 bg-green-500 rounded-full mt-2 mr-3"></span>
+                      <span className="text-gray-700">{strength}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Areas for Improvement */}
+            {typedInterview.improvements && typedInterview.improvements.length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold text-amber-800 mb-3">Areas for Improvement</h3>
+                <ul className="space-y-2">
+                  {typedInterview.improvements.map((improvement: string, idx: number) => (
+                    <li key={idx} className="flex items-start">
+                      <span className="flex-shrink-0 w-2 h-2 bg-amber-500 rounded-full mt-2 mr-3"></span>
+                      <span className="text-gray-700">{improvement}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Questions and Answers */}
+      <div className="space-y-6">
+        <h2 className="text-2xl font-semibold text-gray-900">Interview Questions & Answers</h2>
+        {typedInterview.answers?.map((answer: AnswerItem, index: number) => (
+          <div key={answer.id} className="bg-white shadow-sm border border-gray-200 rounded-lg p-6">
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Question {answer.question_number}</h3>
+            </div>
+
             <div className="space-y-4">
               <div>
-                <h4 className="font-medium text-gray-700 mb-2">Question:</h4>
-                <p className="text-gray-900 bg-gray-50 p-3 rounded-md">{item.question_text}</p>
+                <h4 className="font-medium text-gray-900 mb-2">Question:</h4>
+                <p className="text-gray-700 bg-gray-50 p-3 rounded-lg">{answer.question_text}</p>
               </div>
+
               <div>
-                <h4 className="font-medium text-gray-700 mb-2">Your Answer:</h4>
-                <p className="text-gray-900 bg-blue-50 p-3 rounded-md">{item.user_answer}</p>
-              </div>
-              <div>
-                <h4 className="font-medium text-gray-700 mb-2">AI Feedback:</h4>
-                <p className="text-gray-900 bg-green-50 p-3 rounded-md">{item.ai_feedback}</p>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <h4 className="font-medium text-green-700 mb-2">Strengths:</h4>
-                  <ul className="space-y-1">
-                    {item.strengths?.map((strength, idx) => (
-                      <li key={idx} className="text-sm text-green-600 flex items-center">
-                        <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-2"></span>
-                        {strength}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div>
-                  <h4 className="font-medium text-red-700 mb-2">Areas for Improvement:</h4>
-                  <ul className="space-y-1">
-                    {item.improvements?.map((improvement, idx) => (
-                      <li key={idx} className="text-sm text-red-600 flex items-center">
-                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full mr-2"></span>
-                        {improvement}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                <h4 className="font-medium text-gray-900 mb-2">Your Answer:</h4>
+                <p className="text-gray-700 bg-blue-50 p-3 rounded-lg">{answer.user_answer}</p>
               </div>
             </div>
           </div>

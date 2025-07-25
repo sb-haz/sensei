@@ -281,8 +281,6 @@ export default function InterviewPage() {
                     },
                     interviewHistory: prevQuestions,
                     template: template,
-                    testMode: true, // Signal that we want short test questions
-                    instructions: 'Keep the question very brief and simple, maximum 1-2 sentences for testing purposes.'
                 }),
             });
 
@@ -381,113 +379,21 @@ export default function InterviewPage() {
             });
 
             if (interview.id) {
-                // Save the answer to Supabase if we have an interview ID
+                // Save the answer to Supabase answers table
                 const supabase = createClient();
-                const { data: feedbackData, error: feedbackError } = await supabase
-                    .from('feedback')
+                const { error: answerError } = await supabase
+                    .from('answers')
                     .insert({
                         interview_id: interview.id,
+                        question_number: interview.questions.length,
                         question_text: currentQuestion,
-                        user_answer: answer.trim(),
-                        ai_feedback: '', // Will be updated by background process
-                        score: null,
-                        strengths: [],
-                        improvements: []
-                    })
-                    .select()
-                    .single();
+                        user_answer: answer.trim()
+                    });
                 
-                if (feedbackError) {
-                    console.error('Failed to save feedback:', feedbackError);
+                if (answerError) {
+                    console.error('Failed to save answer:', answerError);
                 } else {
                     console.log('Successfully saved answer to database');
-                    
-                    // Generate feedback in background with retry logic
-                    const generateFeedback = async (retries = 3) => {
-                        for (let i = 0; i < retries; i++) {
-                            try {
-                                // Log template state for debugging
-                                console.log('Current template state:', {
-                                    template,
-                                    difficulty: template?.difficulty,
-                                    rawDifficulty: template?.difficulty?.toLowerCase?.()
-                                });
-
-                                // Normalize difficulty to ensure it matches expected values
-                                let normalizedDifficulty = 'medium'; // default
-                                if (template?.difficulty) {
-                                    const diff = template.difficulty.toLowerCase();
-                                    normalizedDifficulty = ['easy', 'medium', 'hard'].includes(diff) ? diff : 'medium';
-                                }
-
-                                // Prepare feedback request data with validated fields
-                                const feedbackRequestData = {
-                                    userDetails: {
-                                        name: template?.candidate_name || 'Candidate',
-                                        job_info: {
-                                            title: template?.role || 'Software Engineer',
-                                            level: template?.level || 'Mid-Level',
-                                            company: template?.company || 'Company'
-                                        }
-                                    },
-                                    question: currentQuestion,
-                                    answer: answer.trim(),
-                                    interviewId: interview.id,
-                                    feedbackId: feedbackData.id,
-                                    template: {
-                                        ...template,
-                                        difficulty: normalizedDifficulty // Use normalized difficulty
-                                    },
-                                    isEndOfInterview: false,
-                                    testMode: true, // For shorter responses during testing
-                                    debug: {
-                                        originalDifficulty: template?.difficulty,
-                                        normalizedDifficulty,
-                                        templateId: template?.id
-                                    }
-                                };
-
-                                console.log('Sending feedback request:', feedbackRequestData);
-
-                                const response = await fetch('/api/generate-feedback', {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                    },
-                                    body: JSON.stringify(feedbackRequestData),
-                                });
-
-                                if (!response.ok) {
-                                    const errorData = await response.json().catch(() => ({}));
-                                    console.error('Feedback API Error Details:', {
-                                        status: response.status,
-                                        statusText: response.statusText,
-                                        errorData,
-                                        requestData: feedbackRequestData
-                                    });
-                                    throw new Error(`Failed to generate feedback: ${response.status} ${errorData.error || response.statusText}`);
-                                }
-
-                                const responseData = await response.json();
-                                console.log('Feedback generated successfully:', responseData);
-                                return responseData;
-                            } catch (error) {
-                                console.error(`Feedback generation attempt ${i + 1} failed:`, error);
-                                if (i === retries - 1) {
-                                    // On final retry, show a toast to the user
-                                    toast.error('Failed to generate feedback for this answer, but your answer has been saved.');
-                                } else {
-                                    // Wait before retrying, with exponential backoff
-                                    await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
-                                }
-                            }
-                        }
-                    };
-
-                    // Start the feedback generation process
-                    generateFeedback().catch(error => {
-                        console.error('All feedback generation attempts failed:', error);
-                    });
                 }
             } else {
                 console.warn('No interview ID available, answer only saved in local state');
@@ -529,17 +435,8 @@ export default function InterviewPage() {
 
                 // Generate final comprehensive feedback
                 console.log('Preparing final feedback with template:', {
-                    template,
-                    difficulty: template?.difficulty,
-                    rawDifficulty: template?.difficulty?.toLowerCase?.()
+                    template
                 });
-
-                // Normalize difficulty for final feedback
-                let normalizedDifficulty = 'medium'; // default
-                if (template?.difficulty) {
-                    const diff = template.difficulty.toLowerCase();
-                    normalizedDifficulty = ['easy', 'medium', 'hard'].includes(diff) ? diff : 'medium';
-                }
 
                 const finalFeedbackData = {
                     userDetails: {
@@ -551,15 +448,9 @@ export default function InterviewPage() {
                         }
                     },
                     interviewHistory: interview.questions,
-                    difficulty: normalizedDifficulty,
+                    template: template,
                     interviewId: interview.id,
-                    isEndOfInterview: true,
-                    testMode: true, // For shorter responses during testing
-                    debug: {
-                        originalDifficulty: template?.difficulty,
-                        normalizedDifficulty,
-                        templateId: template?.id
-                    }
+                    isEndOfInterview: true
                 };
 
                 console.log('Sending final feedback request:', finalFeedbackData);
