@@ -51,7 +51,7 @@ export default function InterviewPage() {
     const [isRecording, setIsRecording] = useState(false);
     const [answer, setAnswer] = useState('');
     const [loading, setLoading] = useState(true);  // Start with loading state true
-    const [currentQuestion, setCurrentQuestion] = useState('Hi! Please wait while I prepare your first question...');  // Initial loading message
+    const [currentQuestion, setCurrentQuestion] = useState('');  // Will be set after we load user name
     const [showEndConfirm, setShowEndConfirm] = useState(false);
     const [isInterviewerSpeaking, setIsInterviewerSpeaking] = useState(false);
     const [template, setTemplate] = useState<Template | null>(null);
@@ -61,6 +61,39 @@ export default function InterviewPage() {
     });
     const [feedback, setFeedback] = useState<any>(null);
     const [showFeedback, setShowFeedback] = useState(false);
+    const [userFullName, setUserFullName] = useState<string>('');
+
+    // Load user's full name for personalization
+    useEffect(() => {
+        const loadUserName = async () => {
+            try {
+                const supabase = createClient();
+                const { data: { user } } = await supabase.auth.getUser();
+                
+                if (user) {
+                    const { data: userData } = await supabase
+                        .from('users')
+                        .select('full_name')
+                        .eq('id', user.id)
+                        .single();
+                    
+                    if (userData?.full_name) {
+                        setUserFullName(userData.full_name);
+                        setCurrentQuestion(`Hi ${userData.full_name}! Please wait while I prepare your first question...`);
+                    } else {
+                        setCurrentQuestion('Hi there! Please wait while I prepare your first question...');
+                    }
+                } else {
+                    setCurrentQuestion('Hi there! Please wait while I prepare your first question...');
+                }
+            } catch (error) {
+                console.error('Error loading user name:', error);
+                setCurrentQuestion('Hi there! Please wait while I prepare your first question...');
+            }
+        };
+
+        loadUserName();
+    }, []);
 
     // Initialize transcription service
     useEffect(() => {
@@ -274,7 +307,7 @@ export default function InterviewPage() {
                 },
                 body: JSON.stringify({
                     userDetails: {
-                        name: template?.candidate_name || 'Candidate',
+                        name: userFullName || 'there', // Use full name if available, otherwise default greeting
                         job_info: {
                             title: template?.role || 'Software Engineer',
                             level: template?.level,
@@ -443,7 +476,7 @@ export default function InterviewPage() {
 
                 const finalFeedbackData = {
                     userDetails: {
-                        name: template?.candidate_name || 'Candidate',
+                        name: userFullName || 'there', // Use full name if available, otherwise default greeting
                         job_info: {
                             title: template?.role || 'Software Engineer',
                             level: template?.level || 'Mid-Level',
@@ -495,7 +528,9 @@ export default function InterviewPage() {
             <div className="min-h-screen bg-gray-900 flex items-center justify-center">
                 <div className="bg-white p-8 rounded-lg max-w-md">
                     <h2 className="text-2xl font-bold mb-4 text-center">Setup Your Interview</h2>
-                    <h3 className="text-lg text-center mb-2">Welcome to your technical interview!</h3>
+                    <h3 className="text-lg text-center mb-2">
+                        Welcome to your technical interview{userFullName ? `, ${userFullName}` : ''}!
+                    </h3>
                     <p className="text-gray-600 mb-6">
                         Allow access to your camera and microphone if available. You can proceed with the interview even without these devices.
                     </p>

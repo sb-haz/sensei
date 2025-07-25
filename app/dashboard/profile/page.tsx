@@ -1,11 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useRouter } from 'next/navigation';
 
 interface UserProfile {
@@ -17,16 +13,27 @@ interface UserProfile {
 export default function ProfilePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [userEmail, setUserEmail] = useState<string>('');
-  const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [fullName, setFullName] = useState('');
+  const [lastSavedName, setLastSavedName] = useState('');
   const supabase = createClient();
   const router = useRouter();
 
   useEffect(() => {
     loadProfile();
   }, []);
+
+  // Debounced auto-save effect
+  useEffect(() => {
+    if (!profile || fullName === lastSavedName || loading) return;
+
+    const timeoutId = setTimeout(() => {
+      autoSave();
+    }, 1000); // Save 1 second after user stops typing
+
+    return () => clearTimeout(timeoutId);
+  }, [fullName, profile, lastSavedName, loading]);
 
   const loadProfile = async () => {
     try {
@@ -56,7 +63,9 @@ export default function ProfilePage() {
 
       if (profileData) {
         setProfile(profileData);
-        setFullName(profileData.full_name || '');
+        const name = profileData.full_name || '';
+        setFullName(name);
+        setLastSavedName(name);
       } else {
         console.error('No profile found for user - this should be created automatically on signup');
       }
@@ -67,15 +76,16 @@ export default function ProfilePage() {
     }
   };
 
-  const handleSave = async () => {
-    if (!profile) return;
+  const autoSave = useCallback(async () => {
+    if (!profile || saving) return;
 
     setSaving(true);
     try {
+      const trimmedName = fullName.trim();
       const { error } = await supabase
         .from('users')
         .update({
-          full_name: fullName.trim() || null,
+          full_name: trimmedName || null,
           updated_at: new Date().toISOString()
         })
         .eq('id', profile.id);
@@ -84,20 +94,15 @@ export default function ProfilePage() {
 
       setProfile({
         ...profile,
-        full_name: fullName.trim() || ''
+        full_name: trimmedName
       });
-      setIsEditing(false);
+      setLastSavedName(trimmedName);
     } catch (error) {
-      console.error('Error updating profile:', error);
+      console.error('Error auto-saving profile:', error);
     } finally {
       setSaving(false);
     }
-  };
-
-  const handleCancel = () => {
-    setFullName(profile?.full_name || '');
-    setIsEditing(false);
-  };
+  }, [fullName, profile, saving, supabase]);
 
   if (loading) {
     return (
@@ -116,87 +121,77 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-2xl">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Profile</h1>
-        <p className="text-gray-600 mt-2">Manage your account information</p>
+    <div className="max-w-4xl space-y-12">
+      <div className="space-y-3">
+        <h1 className="text-4xl font-bold text-foreground tracking-tight">Profile</h1>
+        <p className="text-lg text-muted-foreground leading-relaxed">Manage your account information and preferences</p>
       </div>
 
-      <Card className="p-6">
-        <div className="space-y-6">
+      <div className="bg-white rounded-xl p-8 border border-border shadow-sm">
+        <div className="space-y-8">
           {/* Profile Header */}
-          <div className="flex items-center space-x-4">
-            <div className="bg-gray-200 flex items-center justify-center h-16 w-16 rounded-full">
-              <span className="text-2xl font-semibold text-gray-600">
+          <div className="flex items-center space-x-6">
+            <div className="bg-primary/10 flex items-center justify-center h-20 w-20 rounded-2xl border border-primary/20">
+              <span className="text-3xl font-semibold text-primary">
                 {fullName ? fullName.charAt(0).toUpperCase() : userEmail.charAt(0).toUpperCase()}
               </span>
             </div>
-            <div>
-              <h3 className="text-lg font-semibold">{fullName || 'No name set'}</h3>
-              <p className="text-gray-600">{userEmail}</p>
+            <div className="space-y-1">
+              <h3 className="text-2xl font-semibold text-foreground">{fullName || 'No name set'}</h3>
+              <p className="text-muted-foreground">{userEmail}</p>
             </div>
           </div>
 
           {/* Form Fields */}
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input
+          <div className="grid gap-6">
+            <div className="space-y-2">
+              <label htmlFor="email" className="text-sm font-medium text-foreground">Email Address</label>
+              <input
                 id="email"
                 value={userEmail}
                 disabled
-                className="bg-gray-50"
+                className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-xl text-foreground placeholder:text-muted-foreground disabled:opacity-60"
               />
-              <p className="text-sm text-gray-500 mt-1">Email is managed by your account settings</p>
+              <p className="text-sm text-muted-foreground">Email is managed through your account settings</p>
             </div>
 
-            <div>
-              <Label htmlFor="fullName">Full Name</Label>
-              <Input
-                id="fullName"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                disabled={!isEditing}
-                placeholder="Enter your full name"
-              />
+            <div className="space-y-2">
+              <label htmlFor="fullName" className="text-sm font-medium text-foreground">Full Name</label>
+              <div className="relative">
+                <input
+                  id="fullName"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Enter your full name"
+                  className="w-full px-4 py-3 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200 pr-20"
+                />
+                {saving && (
+                  <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                      <span className="text-sm text-muted-foreground">Saving...</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground">Changes are automatically saved</p>
             </div>
 
-            <div>
-              <Label>Member Since</Label>
-              <Input
-                value={new Date(profile.created_at).toLocaleDateString()}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Member Since</label>
+              <input
+                value={new Date(profile.created_at).toLocaleDateString('en-US', { 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}
                 disabled
-                className="bg-gray-50"
+                className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-xl text-foreground disabled:opacity-60"
               />
             </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex space-x-3 pt-4">
-            {!isEditing ? (
-              <Button onClick={() => setIsEditing(true)}>
-                Edit Profile
-              </Button>
-            ) : (
-              <>
-                <Button 
-                  onClick={handleSave} 
-                  disabled={saving}
-                >
-                  {saving ? 'Saving...' : 'Save Changes'}
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={handleCancel}
-                  disabled={saving}
-                >
-                  Cancel
-                </Button>
-              </>
-            )}
           </div>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }

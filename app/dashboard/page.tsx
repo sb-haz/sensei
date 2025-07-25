@@ -12,22 +12,31 @@ export default async function Dashboard() {
     }
 
     return (
-        <div className="space-y-8">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Mock Interviews</h1>
-                    <p className="text-gray-600 mt-2">Practice with AI-powered interview sessions</p>
+        <div className="space-y-12">
+            {/* Header Section */}
+            <div className="flex justify-between items-start">
+                <div className="space-y-3">
+                    <h1 className="text-4xl font-bold text-foreground tracking-tight">
+                        Mock Interviews
+                    </h1>
+                    <p className="text-lg text-muted-foreground max-w-2xl leading-relaxed">
+                        Practice with AI-powered interview sessions tailored to your target role and company
+                    </p>
                 </div>
                 <Link
                     href="/interview"
-                    className="bg-green-600 text-white px-6 py-3 rounded-md font-medium hover:bg-green-700 transition-colors"
+                    className="bg-primary text-primary-foreground px-6 py-2.5 rounded-full text-sm font-medium hover:bg-primary/90 transition-all duration-200"
                 >
-                    New Custom Interview
+                    Start Custom Interview
                 </Link>
             </div>
 
-            <div>
-                <h2 className="text-xl font-semibold mb-4">Choose an Interview Template</h2>
+            {/* Templates Section */}
+            <div className="space-y-8">
+                <div className="flex items-center gap-4">
+                    <div className="w-1 h-10 bg-primary rounded-full"></div>
+                    <h2 className="text-3xl font-bold text-foreground">Interview Templates</h2>
+                </div>
                 <TemplatesList />
             </div>
         </div>

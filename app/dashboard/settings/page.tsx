@@ -2,10 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 
 interface UserSettings {
@@ -129,28 +126,34 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Interview Settings</h1>
+    <div className="max-w-4xl mx-auto space-y-8">
+      <div className="space-y-2">
+        <h1 className="text-4xl font-bold text-foreground tracking-tight">Settings</h1>
+        <p className="text-lg text-muted-foreground">Customize your interview experience and preferences</p>
+      </div>
       
       {message && (
-        <div className={`mb-6 p-4 rounded-md ${
+        <div className={`p-4 rounded-xl border ${
           message.includes('Error') 
-            ? 'bg-red-50 text-red-700 border border-red-200' 
-            : 'bg-green-50 text-green-700 border border-green-200'
+            ? 'bg-red-50 text-red-700 border-red-200' 
+            : 'bg-green-50 text-green-700 border-green-200'
         }`}>
           {message}
         </div>
       )}
 
-      <div className="space-y-8">
+      <div className="space-y-6">
         {/* Interviewer Voice Settings */}
-        <Card className="p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Interviewer Voice</h2>
+        <div className="glass rounded-2xl p-8 border border-border/50">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-1 h-8 bg-primary rounded-full"></div>
+            <h2 className="text-2xl font-semibold text-foreground">Interviewer Voice</h2>
+          </div>
           <div className="grid md:grid-cols-2 gap-6">
             <div>
-              <Label htmlFor="gender" className="text-sm font-medium text-gray-700">
+              <label htmlFor="gender" className="text-sm font-medium text-foreground">
                 Interviewer Gender
-              </Label>
+              </label>
               <select
                 id="gender"
                 value={settings.interviewer_gender}
@@ -164,9 +167,9 @@ export default function SettingsPage() {
             </div>
             
             <div>
-              <Label htmlFor="speed" className="text-sm font-medium text-gray-700">
+              <label htmlFor="speed" className="text-sm font-medium text-foreground">
                 Voice Speed: {settings.interviewer_voice_speed}x
-              </Label>
+              </label>
               <input
                 id="speed"
                 type="range"
@@ -184,16 +187,19 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
-        </Card>
+        </div>
 
         {/* Interview Preferences */}
-        <Card className="p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Interview Preferences</h2>
+        <div className="glass rounded-2xl p-8 border border-border/50">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-1 h-8 bg-primary rounded-full"></div>
+            <h2 className="text-2xl font-semibold text-foreground">Interview Preferences</h2>
+          </div>
           <div className="grid md:grid-cols-2 gap-6">
             <div>
-              <Label htmlFor="difficulty" className="text-sm font-medium text-gray-700">
+              <label htmlFor="difficulty" className="text-sm font-medium text-foreground">
                 Difficulty Preference
-              </Label>
+              </label>
               <select
                 id="difficulty"
                 value={settings.difficulty_preference}
@@ -211,9 +217,9 @@ export default function SettingsPage() {
             </div>
 
             <div>
-              <Label htmlFor="feedback" className="text-sm font-medium text-gray-700">
+              <label htmlFor="feedback" className="text-sm font-medium text-foreground">
                 Feedback Detail Level
-              </Label>
+              </label>
               <select
                 id="feedback"
                 value={settings.feedback_detail_level}
@@ -226,16 +232,19 @@ export default function SettingsPage() {
               </select>
             </div>
           </div>
-        </Card>
+        </div>
 
         {/* Interface Settings */}
-        <Card className="p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Interface Settings</h2>
+        <div className="glass rounded-2xl p-8 border border-border/50">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-1 h-8 bg-primary rounded-full"></div>
+            <h2 className="text-2xl font-semibold text-foreground">Interface Settings</h2>
+          </div>
           <div className="grid md:grid-cols-2 gap-6">
             <div>
-              <Label htmlFor="theme" className="text-sm font-medium text-gray-700">
+              <label htmlFor="theme" className="text-sm font-medium text-foreground">
                 Theme
-              </Label>
+              </label>
               <select
                 id="theme"
                 value={settings.theme}
@@ -248,9 +257,9 @@ export default function SettingsPage() {
             </div>
 
             <div>
-              <Label htmlFor="language" className="text-sm font-medium text-gray-700">
+              <label htmlFor="language" className="text-sm font-medium text-foreground">
                 Language
-              </Label>
+              </label>
               <select
                 id="language"
                 value={settings.language}
@@ -265,45 +274,48 @@ export default function SettingsPage() {
               </select>
             </div>
           </div>
-        </Card>
+        </div>
 
         {/* Feature Settings */}
-        <Card className="p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Features</h2>
+        <div className="glass rounded-2xl p-8 border border-border/50">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-1 h-8 bg-primary rounded-full"></div>
+            <h2 className="text-2xl font-semibold text-foreground">Features</h2>
+          </div>
           <div className="space-y-4">
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-3">
               <Checkbox
                 id="auto-save"
                 checked={settings.auto_save_answers}
                 onCheckedChange={(checked) => handleChange('auto_save_answers', checked)}
               />
-              <Label htmlFor="auto-save" className="text-sm font-medium text-gray-700">
+              <label htmlFor="auto-save" className="text-sm font-medium text-foreground cursor-pointer">
                 Auto-save answers as you type
-              </Label>
+              </label>
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-3">
               <Checkbox
                 id="timer"
                 checked={settings.show_question_timer}
                 onCheckedChange={(checked) => handleChange('show_question_timer', checked)}
               />
-              <Label htmlFor="timer" className="text-sm font-medium text-gray-700">
+              <label htmlFor="timer" className="text-sm font-medium text-foreground cursor-pointer">
                 Show question timer during interviews
-              </Label>
+              </label>
             </div>
           </div>
-        </Card>
+        </div>
 
         {/* Save Button */}
         <div className="flex justify-end">
-          <Button 
+          <button 
             onClick={saveSettings}
             disabled={saving}
-            className="px-8 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+            className="px-8 py-3 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary/90 disabled:opacity-50 transition-all duration-200 shadow-lg shadow-primary/25"
           >
             {saving ? 'Saving...' : 'Save Settings'}
-          </Button>
+          </button>
         </div>
       </div>
     </div>
