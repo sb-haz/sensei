@@ -13,6 +13,16 @@ export function Sidebar() {
         { href: "/dashboard/profile", label: "Profile", icon: "👤" },
     ];
 
+    const isActiveRoute = (href: string) => {
+        if (href === "/dashboard") {
+            return pathname === "/dashboard";
+        }
+        if (href === "/dashboard/history") {
+            return pathname === "/dashboard/history" || pathname.startsWith("/dashboard/feedback/");
+        }
+        return pathname === href;
+    };
+
     return (
         <aside className="fixed left-0 top-0 h-full w-72 bg-card border-r border-border z-40">
             <div className="p-6">
@@ -26,7 +36,7 @@ export function Sidebar() {
                             key={item.href}
                             href={item.href}
                             className={`group flex items-center gap-4 px-4 py-2.5 rounded-full text-sm font-medium transition-all duration-200 ${
-                                pathname === item.href
+                                isActiveRoute(item.href)
                                     ? "bg-primary text-primary-foreground"
                                     : "text-foreground hover:bg-accent hover:text-accent-foreground"
                             }`}

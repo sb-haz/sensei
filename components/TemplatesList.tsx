@@ -58,8 +58,9 @@ export default async function TemplatesList() {
             {templates?.map((template, index) => {
                 const config = cardConfigs[index % cardConfigs.length];
                 return (
-                    <div 
-                        key={template.id} 
+                    <Link
+                        key={template.id}
+                        href={`/interview?template=${template.id}`}
                         className={`group ${config.border} rounded-2xl transition-all duration-200 border-2 hover:shadow-md cursor-pointer overflow-hidden bg-white h-96 flex flex-col`}
                     >
                         <div className={`${config.gradient} h-32 group-hover:h-20 transition-all duration-300 flex items-center justify-center flex-shrink-0`}>
@@ -90,20 +91,20 @@ export default async function TemplatesList() {
                                 </div>
 
                                 <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                    <Link
-                                        href={`/interview?template=${template.id}`}
-                                        className="text-blue-600 hover:text-blue-800 text-sm font-medium underline"
-                                    >
+                                    <span className="text-blue-600 hover:text-blue-800 text-sm font-medium underline">
                                         Start Interview →
-                                    </Link>
+                                    </span>
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </Link>
                 );
             })}
             
-            <div className="group border-gray-200 hover:border-blue-400 rounded-2xl transition-all duration-200 border-2 border-dashed cursor-pointer overflow-hidden bg-white h-96 flex flex-col">
+            <Link
+                href="/interview"
+                className="group border-gray-200 hover:border-blue-400 rounded-2xl transition-all duration-200 border-2 border-dashed cursor-pointer overflow-hidden bg-white h-96 flex flex-col"
+            >
                 <div className="bg-gradient-to-br from-gray-100 to-gray-50 h-32 group-hover:h-20 transition-all duration-300 flex items-center justify-center flex-shrink-0">
                     <div className="text-4xl text-gray-400">
                         +
@@ -132,16 +133,13 @@ export default async function TemplatesList() {
                         </div>
 
                         <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                            <Link
-                                href="/interview"
-                                className="text-blue-600 hover:text-blue-800 text-sm font-medium underline"
-                            >
+                            <span className="text-blue-600 hover:text-blue-800 text-sm font-medium underline">
                                 Create Interview →
-                            </Link>
+                            </span>
                         </div>
                     </div>
                 </div>
-            </div>
+            </Link>
         </div>
     );
 }
