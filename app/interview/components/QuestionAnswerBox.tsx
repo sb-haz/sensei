@@ -21,9 +21,14 @@ export default function QuestionAnswerBox({
 }: QuestionAnswerBoxProps) {
     return (
         <div className="bg-slate-900 p-4 rounded-lg">
-            <div className="bg-gray-800 rounded p-4 mb-4 min-h-[90px]">
+            <div className="bg-gray-800 rounded p-4 mb-4 min-h-[90px] relative">
+                {loading && (
+                    <div className="absolute inset-0 bg-gray-800/50 flex items-center justify-center">
+                        <div className="animate-pulse text-white text-lg">Loading question...</div>
+                    </div>
+                )}
                 <p className="text-white text-lg">
-                    {currentQuestion || 'Loading question...'}
+                    {currentQuestion}
                 </p>
             </div>
 

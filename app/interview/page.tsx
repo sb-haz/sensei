@@ -44,8 +44,8 @@ export default function InterviewPage() {
     const [elapsedTime, setElapsedTime] = useState('00:00');
     const [isRecording, setIsRecording] = useState(false);
     const [answer, setAnswer] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [currentQuestion, setCurrentQuestion] = useState('');
+    const [loading, setLoading] = useState(true);  // Start with loading state true
+    const [currentQuestion, setCurrentQuestion] = useState('Hi! Please wait while I prepare your first question...');  // Initial loading message
     const [showEndConfirm, setShowEndConfirm] = useState(false);
     const [isInterviewerSpeaking, setIsInterviewerSpeaking] = useState(false);
     const [template, setTemplate] = useState<Template | null>(null);
@@ -209,8 +209,8 @@ export default function InterviewPage() {
     };
 
     // Fetch next question
-    const fetchNextQuestion = async () => {
-        if (interview.questions.length >= interview.settings.duration) {
+    const fetchNextQuestion = async (prevQuestions = interview.questions) => {
+        if (prevQuestions.length >= interview.settings.duration) {
             await handleEndInterview();
             return true;
         }
@@ -221,7 +221,7 @@ export default function InterviewPage() {
 
         try {
             console.log('Fetching next question...', {
-                questionCount: interview.questions.length,
+                questionCount: prevQuestions.length,
                 settings: interview.settings
             });
 
@@ -239,7 +239,7 @@ export default function InterviewPage() {
                             sector: 'Technology'
                         }
                     },
-                    interviewHistory: interview.questions,
+                    interviewHistory: prevQuestions,
                     settings: interview.settings,
                     template: template
                 }),
@@ -329,8 +329,8 @@ export default function InterviewPage() {
             setCurrentQuestion('');
             setAnswer('');
 
-            // Then fetch the next question
-            await fetchNextQuestion();
+            // Then fetch the next question with the updated questions array
+            await fetchNextQuestion(newQuestions);
         } catch (error) {
             console.error('Failed to save answer:', error);
         } finally {
@@ -395,27 +395,19 @@ export default function InterviewPage() {
                         {template ? `Interview type: ${template.name} - ${template.role} (${template.level})` : 'Standard Software Engineering Interview'}
                     </p>
                     <button
-                        onClick={async () => {
-                            try {
-                                setLoading(true);
-                                const result = await fetchNextQuestion();
-                                if (result) {
-                                    setShowPermissions(false);
-                                } else {
-                                    throw new Error('Failed to load first question');
-                                }
-                            } catch (error) {
-                                console.error('Failed to start interview:', error);
-                                // Show error message
-                                setCurrentQuestion('Error starting interview. Please try again.');
-                            } finally {
-                                setLoading(false);
-                            }
+                        onClick={() => {
+                            setShowPermissions(false);
+                            // Start fetching the question after transitioning to the interview view
+                            setTimeout(() => {
+                                fetchNextQuestion().catch(error => {
+                                    console.error('Failed to start interview:', error);
+                                    setCurrentQuestion('Error starting interview. Please try again.');
+                                });
+                            }, 0);
                         }}
-                        disabled={loading}
-                        className="w-full bg-blue-600 text-white py-3 rounded-md font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+                        className="w-full bg-blue-600 text-white py-3 rounded-md font-medium hover:bg-blue-700 transition-colors"
                     >
-                        {loading ? 'Starting Interview...' : 'Continue'}
+                        Start Interview
                     </button>
                 </div>
             </div>
