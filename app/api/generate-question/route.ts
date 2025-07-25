@@ -11,14 +11,24 @@ export async function POST(request: Request) {
         const systemPrompt = `You are an experienced technical interviewer conducting a software engineering interview. Act as a friendly yet professional interviewer who builds rapport while maintaining high technical standards.
 
 Context:
-- Interviewer Name: Alex
-- Candidate: ${userDetails?.name || 'candidate'} 
-- Questions Remaining: ${settings.duration - interviewHistory.length}/${settings.duration}
-- Template: ${template?.name || 'Software Engineering Interview'}
-- Role: ${template?.role || 'Software Engineer'}
-- Level: ${template?.level || settings.difficulty}
+Interview Setup:
+- Interviewer: Alex
+- Candidate: ${userDetails?.name || 'candidate'}
+- Progress: Question ${interviewHistory.length + 1} of ${template?.number_of_questions || 4}
+- Duration: ${template?.duration_minutes || 60} minutes planned
+- Questions: ${template?.number_of_questions || 4} total questions
+
+Position Details:
 - Company: ${template?.company || 'Not specified'}
-${template?.description ? `- Position Details: ${template.description}` : ''}
+- Role: ${template?.role || 'Software Engineer'}
+- Level: ${template?.level || 'Not specified'}
+- Interview Type: ${template?.topic || 'Technical'}
+- Difficulty: ${template?.difficulty || 'Medium'}
+- Template Name: ${template?.name || 'Software Engineering Interview'}
+
+${template?.description ? `Position Description:\n${template.description}\n` : ''}
+${template?.level ? `Level Context: Adjust questions based on ${template.level} seniority.\n` : ''}
+${template?.company ? `Company Context: This is a ${template.company} interview.\n` : ''}
 
 Interview Personality:
 - Be warm and welcoming, especially at the start
@@ -157,8 +167,17 @@ Previous Q&A: ${JSON.stringify(interviewHistory)}`;
                     {
                         role: 'user',
                         content: interviewHistory.length === 0
-                            ? `Start the technical interview. Only respond with a natural greeting and ONE clear question. No additional commentary, tips, or notes.`
-                            : `Generate the next interview question. Only respond with ONE clear question, no additional commentary.`
+                            ? `Start the interview with this exact format:
+1. Greet the candidate by name
+2. Introduce yourself as Alex
+3. Specify that this is a ${template?.topic || 'technical'} interview${template?.company ? ` for ${template?.company}` : ''}
+4. Mention the role (${template?.role || 'Software Engineer'}) and level (${template?.level || 'not specified'})
+5. Ask your first question
+
+Example format: "Hi [name]! I'm Alex, and I'll be conducting your [topic] interview${template?.company ? ` for ${template?.company}` : ''} today. We'll be focusing on the [role] ([level]) position. [First question]"
+
+Respond with just the greeting and first question, no additional commentary.`
+                            : `Generate the next question. Only respond with ONE clear question, no additional commentary.`
                     }
                 ]
             })

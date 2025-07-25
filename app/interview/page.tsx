@@ -8,25 +8,29 @@ import QuestionAnswerBox from './components/QuestionAnswerBox';
 import InterviewHeader from './components/InterviewHeader';
 import { createTranscriptionService } from './services/transcription';
 import { createClient } from '@/lib/supabase/client';
+import { toast } from 'sonner';
 
 interface Template {
     id: string;
     name: string;
+    company?: string;
     role: string;
     level: string;
     difficulty: 'easy' | 'medium' | 'hard';
-    company?: string;
+    topic: string;
     description?: string;
     duration_minutes: number;
     number_of_questions: number;
+    is_default: boolean;
+    created_by?: string;
+    created_at?: string;
+    updated_at?: string;
+    candidate_name?: string; // Added for interview context
 }
 
 interface Interview {
+    id?: number;
     questions: { question: string; answer: string; }[];
-    settings: {
-        difficulty: 'easy' | 'medium' | 'hard';
-        duration: number;
-    };
     startTime: Date;
 }
 
@@ -51,12 +55,10 @@ export default function InterviewPage() {
     const [template, setTemplate] = useState<Template | null>(null);
     const [interview, setInterview] = useState<Interview>({
         questions: [],
-        settings: {
-            difficulty: 'medium',
-            duration: 5
-        },
         startTime: new Date()
     });
+    const [feedback, setFeedback] = useState<any>(null);
+    const [showFeedback, setShowFeedback] = useState(false);
 
     // Initialize transcription service
     useEffect(() => {
@@ -101,20 +103,27 @@ export default function InterviewPage() {
                 const supabase = createClient();
                 const { data: templateData } = await supabase
                     .from('interview_templates')
-                    .select('*')
+                    .select(`
+                        id,
+                        name,
+                        company,
+                        role,
+                        level,
+                        difficulty,
+                        topic,
+                        description,
+                        duration_minutes,
+                        number_of_questions,
+                        is_default,
+                        created_by,
+                        created_at,
+                        updated_at
+                    `)
                     .eq('id', templateId)
                     .single();
 
                 if (templateData) {
                     setTemplate(templateData);
-                    // Update interview settings based on template
-                    setInterview(prev => ({
-                        ...prev,
-                        settings: {
-                            difficulty: templateData.difficulty,
-                            duration: templateData.number_of_questions
-                        }
-                    }));
                 }
             }
         };
@@ -210,7 +219,7 @@ export default function InterviewPage() {
 
     // Fetch next question
     const fetchNextQuestion = async (prevQuestions = interview.questions) => {
-        if (prevQuestions.length >= interview.settings.duration) {
+        if (prevQuestions.length >= (template?.number_of_questions || 4)) {
             await handleEndInterview();
             return true;
         }
@@ -222,8 +231,39 @@ export default function InterviewPage() {
         try {
             console.log('Fetching next question...', {
                 questionCount: prevQuestions.length,
-                settings: interview.settings
+                template: template
             });
+
+            // First, create an interview record if we don't have one yet
+            if (!interview.id && template?.id) {
+                const supabase = createClient();
+                
+                // Get the current user first
+                const { data: { user }, error: userError } = await supabase.auth.getUser();
+                
+                if (userError || !user) {
+                    console.error('Auth error:', userError);
+                    throw new Error('User not authenticated');
+                }
+
+                const { data: interviewData, error: interviewError } = await supabase
+                    .from('interviews')
+                    .insert({
+                        template_id: template.id,
+                        user_id: user.id,
+                        status: 'in_progress',
+                        started_at: interview.startTime
+                    })
+                    .select()
+                    .single();
+                
+                if (interviewError) {
+                    console.error('Failed to create interview:', interviewError);
+                    throw new Error('Failed to create interview record');
+                }
+
+                setInterview(prev => ({ ...prev, id: interviewData.id }));
+            }
 
             const response = await fetch('/api/generate-question', {
                 method: 'POST',
@@ -232,16 +272,17 @@ export default function InterviewPage() {
                 },
                 body: JSON.stringify({
                     userDetails: {
-                        name: 'Test User', // TODO: Replace with actual user details
+                        name: template?.candidate_name || 'Candidate',
                         job_info: {
                             title: template?.role || 'Software Engineer',
-                            experience: '5 years',
-                            sector: 'Technology'
+                            level: template?.level,
+                            company: template?.company
                         }
                     },
                     interviewHistory: prevQuestions,
-                    settings: interview.settings,
-                    template: template
+                    template: template,
+                    testMode: true, // Signal that we want short test questions
+                    instructions: 'Keep the question very brief and simple, maximum 1-2 sentences for testing purposes.'
                 }),
             });
 
@@ -313,17 +354,144 @@ export default function InterviewPage() {
         setIsRecording(false);
 
         try {
+            console.log('Saving answer...', {
+                currentQuestion,
+                answer: answer.trim(),
+                interviewId: interview.id
+            });
+
             // First update the interview state with the new Q&A
             const newQuestions = [...interview.questions, {
                 question: currentQuestion,
                 answer: answer.trim()
             }];
 
+            // Log the updated questions array
+            console.log('Updated questions array:', newQuestions);
+
             // Update interview state first
-            setInterview(prev => ({
-                ...prev,
-                questions: newQuestions
-            }));
+            setInterview(prev => {
+                console.log('Previous interview state:', prev);
+                const newState = {
+                    ...prev,
+                    questions: newQuestions
+                };
+                console.log('New interview state:', newState);
+                return newState;
+            });
+
+            if (interview.id) {
+                // Save the answer to Supabase if we have an interview ID
+                const supabase = createClient();
+                const { data: feedbackData, error: feedbackError } = await supabase
+                    .from('feedback')
+                    .insert({
+                        interview_id: interview.id,
+                        question_text: currentQuestion,
+                        user_answer: answer.trim(),
+                        ai_feedback: '', // Will be updated by background process
+                        score: null,
+                        strengths: [],
+                        improvements: []
+                    })
+                    .select()
+                    .single();
+                
+                if (feedbackError) {
+                    console.error('Failed to save feedback:', feedbackError);
+                } else {
+                    console.log('Successfully saved answer to database');
+                    
+                    // Generate feedback in background with retry logic
+                    const generateFeedback = async (retries = 3) => {
+                        for (let i = 0; i < retries; i++) {
+                            try {
+                                // Log template state for debugging
+                                console.log('Current template state:', {
+                                    template,
+                                    difficulty: template?.difficulty,
+                                    rawDifficulty: template?.difficulty?.toLowerCase?.()
+                                });
+
+                                // Normalize difficulty to ensure it matches expected values
+                                let normalizedDifficulty = 'medium'; // default
+                                if (template?.difficulty) {
+                                    const diff = template.difficulty.toLowerCase();
+                                    normalizedDifficulty = ['easy', 'medium', 'hard'].includes(diff) ? diff : 'medium';
+                                }
+
+                                // Prepare feedback request data with validated fields
+                                const feedbackRequestData = {
+                                    userDetails: {
+                                        name: template?.candidate_name || 'Candidate',
+                                        job_info: {
+                                            title: template?.role || 'Software Engineer',
+                                            level: template?.level || 'Mid-Level',
+                                            company: template?.company || 'Company'
+                                        }
+                                    },
+                                    question: currentQuestion,
+                                    answer: answer.trim(),
+                                    interviewId: interview.id,
+                                    feedbackId: feedbackData.id,
+                                    template: {
+                                        ...template,
+                                        difficulty: normalizedDifficulty // Use normalized difficulty
+                                    },
+                                    isEndOfInterview: false,
+                                    testMode: true, // For shorter responses during testing
+                                    debug: {
+                                        originalDifficulty: template?.difficulty,
+                                        normalizedDifficulty,
+                                        templateId: template?.id
+                                    }
+                                };
+
+                                console.log('Sending feedback request:', feedbackRequestData);
+
+                                const response = await fetch('/api/generate-feedback', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify(feedbackRequestData),
+                                });
+
+                                if (!response.ok) {
+                                    const errorData = await response.json().catch(() => ({}));
+                                    console.error('Feedback API Error Details:', {
+                                        status: response.status,
+                                        statusText: response.statusText,
+                                        errorData,
+                                        requestData: feedbackRequestData
+                                    });
+                                    throw new Error(`Failed to generate feedback: ${response.status} ${errorData.error || response.statusText}`);
+                                }
+
+                                const responseData = await response.json();
+                                console.log('Feedback generated successfully:', responseData);
+                                return responseData;
+                            } catch (error) {
+                                console.error(`Feedback generation attempt ${i + 1} failed:`, error);
+                                if (i === retries - 1) {
+                                    // On final retry, show a toast to the user
+                                    toast.error('Failed to generate feedback for this answer, but your answer has been saved.');
+                                } else {
+                                    // Wait before retrying, with exponential backoff
+                                    await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+                                }
+                            }
+                        }
+                    };
+
+                    // Start the feedback generation process
+                    generateFeedback().catch(error => {
+                        console.error('All feedback generation attempts failed:', error);
+                    });
+                }
+            } else {
+                console.warn('No interview ID available, answer only saved in local state');
+            }
 
             // Clear current state before fetching next question
             setCurrentQuestion('');
@@ -342,30 +510,75 @@ export default function InterviewPage() {
     const handleEndInterview = async () => {
         try {
             setLoading(true);
-            
-            // Generate feedback first
-            const feedbackResponse = await fetch('/api/generate-feedback', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
+
+            if (interview.id) {
+                // Update interview status
+                const supabase = createClient();
+                const { error: updateError } = await supabase
+                    .from('interviews')
+                    .update({
+                        status: 'completed',
+                        completed_at: new Date().toISOString(),
+                        total_duration_minutes: Math.floor((new Date().getTime() - interview.startTime.getTime()) / 60000)
+                    })
+                    .eq('id', interview.id);
+
+                if (updateError) {
+                    console.error('Failed to update interview status:', updateError);
+                }
+
+                // Generate final comprehensive feedback
+                console.log('Preparing final feedback with template:', {
+                    template,
+                    difficulty: template?.difficulty,
+                    rawDifficulty: template?.difficulty?.toLowerCase?.()
+                });
+
+                // Normalize difficulty for final feedback
+                let normalizedDifficulty = 'medium'; // default
+                if (template?.difficulty) {
+                    const diff = template.difficulty.toLowerCase();
+                    normalizedDifficulty = ['easy', 'medium', 'hard'].includes(diff) ? diff : 'medium';
+                }
+
+                const finalFeedbackData = {
                     userDetails: {
-                        name: 'Test User', // TODO: Replace with actual user details
+                        name: template?.candidate_name || 'Candidate',
                         job_info: {
-                            title: 'Chef',
-                            experience: '5 years',
-                            sector: 'Hospitality'
+                            title: template?.role || 'Software Engineer',
+                            level: template?.level || 'Mid-Level',
+                            company: template?.company || 'Company'
                         }
                     },
                     interviewHistory: interview.questions,
-                    settings: interview.settings,
-                    interviewId: 'test-id' // TODO: Replace with actual interview ID
-                }),
-            });
+                    difficulty: normalizedDifficulty,
+                    interviewId: interview.id,
+                    isEndOfInterview: true,
+                    testMode: true, // For shorter responses during testing
+                    debug: {
+                        originalDifficulty: template?.difficulty,
+                        normalizedDifficulty,
+                        templateId: template?.id
+                    }
+                };
 
-            if (!feedbackResponse.ok) {
-                throw new Error('Failed to generate feedback');
+                console.log('Sending final feedback request:', finalFeedbackData);
+
+                const feedbackResponse = await fetch('/api/generate-feedback', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(finalFeedbackData),
+                });
+
+                if (!feedbackResponse.ok) {
+                    throw new Error('Failed to generate feedback');
+                }
+
+                const feedback = await feedbackResponse.json();
+                setFeedback(feedback);
+                setShowFeedback(true);
             }
 
             // Stop all media tracks
@@ -377,6 +590,7 @@ export default function InterviewPage() {
             router.push('/dashboard');
         } catch (error) {
             console.error('Error ending interview:', error);
+            toast.error('Failed to end interview. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -434,7 +648,7 @@ export default function InterviewPage() {
                 </div>
                 <ControlPanel
                     questionCount={interview.questions.length + 1}
-                    totalQuestions={interview.settings.duration}
+                    totalQuestions={template?.number_of_questions || 4}
                     isMuted={!isMicEnabled}
                     videoRef={videoRef as React.RefObject<HTMLVideoElement>}
                     onRepeatQuestion={() => setCurrentQuestion(currentQuestion)}
