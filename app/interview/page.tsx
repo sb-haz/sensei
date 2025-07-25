@@ -40,7 +40,7 @@ export default function InterviewPage() {
     const videoRef = useRef<HTMLVideoElement>(null);
     const transcriptionService = useRef(createTranscriptionService());
     const { settings } = useUserSettings();
-    
+
     // State management
     const [isMicEnabled, setIsMicEnabled] = useState(false);
     const [isCameraEnabled, setIsCameraEnabled] = useState(false);
@@ -69,14 +69,14 @@ export default function InterviewPage() {
             try {
                 const supabase = createClient();
                 const { data: { user } } = await supabase.auth.getUser();
-                
+
                 if (user) {
                     const { data: userData } = await supabase
                         .from('users')
                         .select('full_name')
                         .eq('id', user.id)
                         .single();
-                    
+
                     if (userData?.full_name) {
                         setUserFullName(userData.full_name);
                         setCurrentQuestion(`Hi ${userData.full_name}! Please wait while I prepare your first question...`);
@@ -133,7 +133,7 @@ export default function InterviewPage() {
         const loadTemplate = async () => {
             const params = new URLSearchParams(window.location.search);
             const templateId = params.get('template');
-            
+
             if (templateId) {
                 const supabase = createClient();
                 const { data: templateData } = await supabase
@@ -272,10 +272,10 @@ export default function InterviewPage() {
             // First, create an interview record if we don't have one yet
             if (!interview.id && template?.id) {
                 const supabase = createClient();
-                
+
                 // Get the current user first
                 const { data: { user }, error: userError } = await supabase.auth.getUser();
-                
+
                 if (userError || !user) {
                     console.error('Auth error:', userError);
                     throw new Error('User not authenticated');
@@ -291,7 +291,7 @@ export default function InterviewPage() {
                     })
                     .select()
                     .single();
-                
+
                 if (interviewError) {
                     console.error('Failed to create interview:', interviewError);
                     throw new Error('Failed to create interview record');
@@ -330,7 +330,7 @@ export default function InterviewPage() {
                     data
                 });
                 throw new Error(
-                    data.error || 
+                    data.error ||
                     `API request failed with status ${response.status}`
                 );
             }
@@ -348,7 +348,7 @@ export default function InterviewPage() {
             }
 
             console.log('Successfully fetched question:', data.question);
-            
+
             // Read out the question using text-to-speech
             setIsInterviewerSpeaking(true);
             const utterance = new SpeechSynthesisUtterance(data.question);
@@ -356,14 +356,14 @@ export default function InterviewPage() {
             window.speechSynthesis.cancel();
             utterance.onend = () => setIsInterviewerSpeaking(false);
             window.speechSynthesis.speak(utterance);
-            
+
             // Set the question after starting speech synthesis
             setCurrentQuestion(data.question);
             setAnswer('');
-            
+
             // Wait a moment to ensure state is updated
             await new Promise(resolve => setTimeout(resolve, 100));
-            
+
             // Verify the question was set
             if (data.question) {
                 return true;
@@ -425,7 +425,7 @@ export default function InterviewPage() {
                         question_text: currentQuestion,
                         user_answer: answer.trim()
                     });
-                
+
                 if (answerError) {
                     console.error('Failed to save answer:', answerError);
                 } else {
@@ -523,47 +523,64 @@ export default function InterviewPage() {
         }
     };
 
-if (showPermissions) {
+    if (showPermissions) {
         return (
-            <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-                <div className="bg-white p-8 rounded-lg max-w-md">
-                    <h2 className="text-2xl font-bold mb-4 text-center">Setup Your Interview</h2>
-                    <h3 className="text-lg text-center mb-2">
-                        Welcome to your technical interview{userFullName ? `, ${userFullName}` : ''}!
-                    </h3>
-                    <p className="text-gray-600 mb-6">
-                        Allow access to your camera and microphone if available. You can proceed with the interview even without these devices.
-                    </p>
-                    <p className="text-sm text-gray-500 mb-4">
-                        {template ? `Interview type: ${template.name} - ${template.role} (${template.level})` : 'Standard Software Engineering Interview'}
-                    </p>
-                    <button
-                        onClick={() => {
-                            setShowPermissions(false);
-                            // Start fetching the question after transitioning to the interview view
-                            setTimeout(() => {
-                                fetchNextQuestion().catch(error => {
-                                    console.error('Failed to start interview:', error);
-                                    setCurrentQuestion('Error starting interview. Please try again.');
-                                });
-                            }, 0);
-                        }}
-                        className="w-full bg-blue-600 text-white py-3 rounded-md font-medium hover:bg-blue-700 transition-colors"
-                    >
-                        Start Interview
-                    </button>
+            <div className="min-h-screen bg-background flex items-center justify-center p-6">
+                <div className="bg-card border border-border rounded-2xl p-8 max-w-md w-full">
+                    <div className="space-y-6">
+                        <div className="text-center space-y-3">
+                            <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto">
+                                <span className="text-3xl">🎤</span>
+                            </div>
+                            <h2 className="text-2xl font-bold text-foreground">Setup Your Interview</h2>
+                            <h3 className="text-lg text-foreground">
+                                Welcome to your technical interview{userFullName ? `, ${userFullName}` : ''}!
+                            </h3>
+                        </div>
+
+                        <div className="space-y-4">
+                            <p className="text-muted-foreground text-center">
+                                Allow access to your camera and microphone if available. You can proceed with the interview even without these devices.
+                            </p>
+
+                            {template && (
+                                <div className="bg-muted/30 rounded-xl p-4">
+                                    <p className="text-sm text-muted-foreground text-center">
+                                        <span className="font-medium text-foreground">Interview type:</span><br />
+                                        {template.name} - {template.role} ({template.level})
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
+                        <button
+                            onClick={() => {
+                                setShowPermissions(false);
+                                // Start fetching the question after transitioning to the interview view
+                                setTimeout(() => {
+                                    fetchNextQuestion().catch(error => {
+                                        console.error('Failed to start interview:', error);
+                                        setCurrentQuestion('Error starting interview. Please try again.');
+                                    });
+                                }, 0);
+                            }}
+                            className="w-full bg-primary text-primary-foreground py-3 rounded-full font-medium hover:bg-primary/90 transition-all duration-200"
+                        >
+                            Start Interview
+                        </button>
+                    </div>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-gray-900 flex flex-col">
+        <div className="min-h-screen bg-background flex flex-col">
             <InterviewHeader elapsedTime={elapsedTime} />
 
-            <div className="flex flex-col md:flex-row gap-3 p-3">
-                <div className="flex-1 flex flex-col gap-3">
-                    <VideoGrid videoRef={videoRef as React.RefObject<HTMLVideoElement>} className="flex-1 flex flex-col gap-3" />
+            <div className="flex flex-col lg:flex-row gap-6 p-6 flex-1">
+                <div className="flex-1 flex flex-col gap-6">
+                    <VideoGrid videoRef={videoRef as React.RefObject<HTMLVideoElement>} className="flex-1" />
                     <QuestionAnswerBox
                         currentQuestion={currentQuestion}
                         answer={answer}
@@ -590,23 +607,27 @@ if (showPermissions) {
             </div>
 
             {showEndConfirm && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white p-6 rounded-lg max-w-sm mx-4">
-                        <h3 className="text-lg font-semibold mb-4">End Interview?</h3>
-                        <p className="text-gray-600 mb-6">Are you sure you want to end this interview? This action cannot be undone.</p>
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setShowEndConfirm(false)}
-                                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleEndInterview}
-                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
-                            >
-                                End Interview
-                            </button>
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
+                    <div className="bg-card border border-border rounded-2xl p-6 max-w-sm w-full">
+                        <div className="space-y-6">
+                            <div className="space-y-3">
+                                <h3 className="text-lg font-semibold text-foreground">End Interview?</h3>
+                                <p className="text-muted-foreground">Are you sure you want to end this interview? This action cannot be undone.</p>
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setShowEndConfirm(false)}
+                                    className="flex-1 px-4 py-2 border border-border text-foreground rounded-full hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleEndInterview}
+                                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-full hover:bg-red-700 transition-all duration-200"
+                                >
+                                    End Interview
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

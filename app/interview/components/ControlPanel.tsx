@@ -20,60 +20,75 @@ export default function ControlPanel({
     onEndInterview
 }: ControlPanelProps) {
     return (
-        <div className="w-full md:w-80 bg-slate-900 rounded-lg p-4">
-            <div className="flex justify-between items-center mb-4">
-                <div className="font-medium text-white">Interview Controls</div>
-                <div className="flex gap-2 text-xs">
-                    <span className="bg-gray-800 text-white px-2 py-1 rounded-full">
-                        Q{questionCount}/{totalQuestions}
-                    </span>
+        <div className="w-full md:w-80 bg-card border border-border rounded-2xl p-6">
+            <div className="space-y-6">
+                <div className="flex items-center gap-4">
+                    <div className="w-1 h-8 bg-primary rounded-full"></div>
+                    <div className="flex-1">
+                        <h3 className="font-semibold text-foreground">Interview Controls</h3>
+                        <div className="flex items-center gap-2 mt-1">
+                            <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm font-medium">
+                                Question {questionCount}/{totalQuestions}
+                            </span>
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-            <div className="space-y-3">
-                <button
-                    onClick={onRepeatQuestion}
-                    className="w-full py-2 bg-blue-600 text-white hover:bg-blue-700 rounded"
-                >
-                    Repeat Question
-                </button>
+                <div className="space-y-4">
+                    <button
+                        onClick={onRepeatQuestion}
+                        className="w-full py-3 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-medium transition-all duration-200"
+                    >
+                        🔄 Repeat Question
+                    </button>
 
-                <button
-                    onClick={onSkipQuestion}
-                    className="w-full py-2 bg-blue-600 text-white hover:bg-blue-700 rounded"
-                >
-                    Skip Question
-                </button>
+                    <button
+                        onClick={onSkipQuestion}
+                        className="w-full py-3 bg-muted text-foreground hover:bg-muted/80 rounded-xl font-medium transition-all duration-200 border border-border"
+                    >
+                        ⏭️ Skip Question
+                    </button>
 
-                <label className="flex items-center justify-between p-2 bg-gray-800 rounded text-white">
-                    <span>Camera</span>
-                    <input
-                        type="checkbox"
-                        defaultChecked
-                        onChange={(e) => {
-                            const stream = videoRef.current?.srcObject as MediaStream;
-                            stream?.getVideoTracks().forEach(track => {
-                                track.enabled = e.target.checked;
-                            });
-                        }}
-                    />
-                </label>
+                    <div className="space-y-3">
+                        <label className="flex items-center justify-between p-4 bg-accent/30 rounded-xl cursor-pointer group hover:bg-accent/50 transition-all duration-200">
+                            <div className="flex items-center gap-3">
+                                <span className="text-lg">📹</span>
+                                <span className="font-medium text-foreground">Camera</span>
+                            </div>
+                            <input
+                                type="checkbox"
+                                defaultChecked
+                                className="accent-primary"
+                                onChange={(e) => {
+                                    const stream = videoRef.current?.srcObject as MediaStream;
+                                    stream?.getVideoTracks().forEach(track => {
+                                        track.enabled = e.target.checked;
+                                    });
+                                }}
+                            />
+                        </label>
 
-                <label className="flex items-center justify-between p-2 bg-gray-800 rounded text-white">
-                    <span>Microphone</span>
-                    <input
-                        type="checkbox"
-                        checked={!isMuted}
-                        onChange={(e) => onMuteToggle(!e.target.checked)}
-                    />
-                </label>
+                        <label className="flex items-center justify-between p-4 bg-accent/30 rounded-xl cursor-pointer group hover:bg-accent/50 transition-all duration-200">
+                            <div className="flex items-center gap-3">
+                                <span className="text-lg">🎤</span>
+                                <span className="font-medium text-foreground">Microphone</span>
+                            </div>
+                            <input
+                                type="checkbox"
+                                checked={!isMuted}
+                                className="accent-primary"
+                                onChange={(e) => onMuteToggle(!e.target.checked)}
+                            />
+                        </label>
+                    </div>
 
-                <button
-                    onClick={onEndInterview}
-                    className="w-full py-2 bg-red-600 text-white hover:bg-red-700 rounded"
-                >
-                    End Interview
-                </button>
+                    <button
+                        onClick={onEndInterview}
+                        className="w-full py-3 bg-red-600 text-white hover:bg-red-700 rounded-xl font-medium transition-all duration-200"
+                    >
+                        🛑 End Interview
+                    </button>
+                </div>
             </div>
         </div>
     );

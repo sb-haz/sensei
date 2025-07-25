@@ -44,9 +44,9 @@ export default function QuestionTimer({ show, onTimeUpdate, resetTrigger }: Ques
   };
 
   return (
-    <div className="flex items-center space-x-2 text-sm">
-      <span className="text-gray-500">Question time:</span>
-      <span className={`font-mono font-medium ${getTimeColor(seconds)}`}>
+    <div className="flex items-center space-x-3 bg-muted/30 px-4 py-2 rounded-full">
+      <span className="text-sm text-muted-foreground">Question time:</span>
+      <span className={`font-mono font-semibold text-sm ${getTimeColor(seconds)}`}>
         {formatTime(seconds)}
       </span>
     </div>
