@@ -1,3 +1,5 @@
+import QuestionTimer from './QuestionTimer';
+
 interface QuestionAnswerBoxProps {
     currentQuestion: string;
     answer: string;
@@ -7,6 +9,8 @@ interface QuestionAnswerBoxProps {
     isRecording: boolean;
     isInterviewerSpeaking: boolean;
     onStartRecording: () => void;
+    showTimer?: boolean;
+    questionNumber?: number;
 }
 
 export default function QuestionAnswerBox({
@@ -17,7 +21,9 @@ export default function QuestionAnswerBox({
     onSubmit,
     isRecording,
     isInterviewerSpeaking,
-    onStartRecording
+    onStartRecording,
+    showTimer = false,
+    questionNumber = 0
 }: QuestionAnswerBoxProps) {
     return (
         <div className="bg-slate-900 p-4 rounded-lg">
@@ -31,6 +37,15 @@ export default function QuestionAnswerBox({
                     {currentQuestion}
                 </p>
             </div>
+
+            {showTimer && (
+                <div className="mb-3 flex justify-center">
+                    <QuestionTimer 
+                        show={!loading && currentQuestion !== ''} 
+                        resetTrigger={questionNumber}
+                    />
+                </div>
+            )}
 
             <div className="flex gap-2">
                 <textarea

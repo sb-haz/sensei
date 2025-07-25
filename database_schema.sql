@@ -1,14 +1,7 @@
--- =============================================================================
--- SENSEI INTERVIEW APPLICATION - COMPLETE DATABASE SCHEMA
--- =============================================================================
--- This is the MAIN and ONLY database schema file for the Sensei interview app
--- Contains: Tables, RLS Policies, Triggers, Functions, Sample Data
--- Run this entire file in Supabase SQL Editor to set up the complete database
--- =============================================================================
+-- Complete Sensei Interview Database Schema
+-- This script creates all tables, policies, triggers, and sample data needed for the interview application
 
--- =============================================================================
--- CLEANUP - Remove existing tables and functions
--- =============================================================================
+-- Delete existing tables if they exist
 DROP TABLE IF EXISTS public.feedback CASCADE;
 DROP TABLE IF EXISTS public.answers CASCADE;
 DROP TABLE IF EXISTS public.interviews CASCADE;
@@ -247,7 +240,7 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
 -- =============================================================================
--- SAMPLE DATA - Interview Templates
+-- SAMPLE DATA
 -- =============================================================================
 
 -- Insert base interview templates
@@ -264,3 +257,11 @@ INSERT INTO public.interview_templates (
  ('Junior Developer Basics', null, 'Software Engineer', 'Junior', 'Easy', 'Technical', 'Fundamental programming concepts and basic algorithms', 30, 5, true, null),
  ('Cloud Engineer AWS', null, 'Cloud Engineer', 'Mid-level', 'Medium', 'Cloud', 'AWS services, infrastructure, and DevOps practices', 50, 4, true, null),
  ('Data Scientist ML Focus', null, 'Data Scientist', 'Senior', 'Hard', 'Technical', 'Machine learning algorithms, statistics, and data analysis', 60, 4, true, null);
+
+-- =============================================================================
+-- COMPLETION MESSAGE
+-- =============================================================================
+
+-- This completes the database schema setup
+-- Users will be automatically created with default settings when they sign up
+-- No manual user data insertion is needed - everything is handled by triggers

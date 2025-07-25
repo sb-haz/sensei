@@ -8,11 +8,15 @@ export async function POST(request: Request) {
 
         const { userDetails, interviewHistory, settings, template } = await request.json();
 
+        // Get user preference for interviewer gender
+        const interviewerName = settings?.interviewer_gender === 'female' ? 'Alexandra' : 
+                               settings?.interviewer_gender === 'male' ? 'Alexander' : 'Alex';
+
         const systemPrompt = `You are an experienced technical interviewer conducting a software engineering interview. Act as a friendly yet professional interviewer who builds rapport while maintaining high technical standards.
 
 Context:
 Interview Setup:
-- Interviewer: Alex
+- Interviewer: ${interviewerName}
 - Candidate: ${userDetails?.name || 'there'}
 - Progress: Question ${interviewHistory.length + 1} of ${template?.number_of_questions || 4}
 - Duration: ${template?.duration_minutes || 60} minutes planned
@@ -88,15 +92,15 @@ Previous Q&A: ${JSON.stringify(interviewHistory)}`;
                         content: interviewHistory.length === 0
                             ? `Start the interview with this exact format:
 1. Greet appropriately - use name if provided, otherwise say "Hi there"
-2. Introduce yourself as Alex
+2. Introduce yourself as ${interviewerName}
 3. Specify that this is a ${template?.topic || 'technical'} interview${template?.company ? ` for ${template?.company}` : ''}
 4. Mention the role (${template?.role || 'Software Engineer'}) and level (${template?.level || 'not specified'})
 5. Ask your first question in MAXIMUM 10 words
 
-Example format: "Hi ${userDetails?.name || 'there'}! I'm Alex, and I'll be conducting your [topic] interview${template?.company ? ` for ${template?.company}` : ''} today. We'll be focusing on the [role] ([level]) position. [Very short first question - max 10 words]"
+Example format: "Hi ${userDetails?.name || 'there'}! I'm ${interviewerName}, and I'll be conducting your [topic] interview${template?.company ? ` for ${template?.company}` : ''} today. We'll be focusing on the [role] ([level]) position. [Very short first question - max 10 words]"
 
 CRITICAL: Questions must be EXTREMELY short - maximum 10 words. No long explanations.`
-                            : `Generate the next question. MAXIMUM 10 words. Be extremely concise. No additional commentary.`
+                            : `Continue as ${interviewerName}. Ask your next question based on their previous answer. Questions must be EXTREMELY short - maximum 10 words. No long explanations or context.`
                     }
                 ]
             })

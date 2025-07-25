@@ -9,6 +9,7 @@ import InterviewHeader from './components/InterviewHeader';
 import { createTranscriptionService } from './services/transcription';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
+import { useUserSettings } from '@/hooks/use-settings';
 
 interface Template {
     id: string;
@@ -38,6 +39,7 @@ export default function InterviewPage() {
     const router = useRouter();
     const videoRef = useRef<HTMLVideoElement>(null);
     const transcriptionService = useRef(createTranscriptionService());
+    const { settings } = useUserSettings();
     
     // State management
     const [isMicEnabled, setIsMicEnabled] = useState(false);
@@ -281,6 +283,7 @@ export default function InterviewPage() {
                     },
                     interviewHistory: prevQuestions,
                     template: template,
+                    userSettings: settings, // Pass user settings to API
                 }),
             });
 
@@ -535,6 +538,8 @@ export default function InterviewPage() {
                         isRecording={isRecording}
                         isInterviewerSpeaking={isInterviewerSpeaking}
                         onStartRecording={() => setIsRecording(true)}
+                        showTimer={settings.show_question_timer}
+                        questionNumber={interview.questions.length + 1}
                     />
                 </div>
                 <ControlPanel
