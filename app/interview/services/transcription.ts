@@ -6,11 +6,24 @@ interface TranscriptionService {
 
 // Speech recognition type declarations
 interface SpeechRecognitionEvent extends Event {
-    results: {
-        isFinal: boolean;
-        [index: number]: { transcript: string; confidence: number; }[];
-    }[];
+    results: SpeechRecognitionResultList;
     resultIndex: number;
+}
+
+interface SpeechRecognitionResultList {
+    length: number;
+    [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+    length: number;
+    isFinal: boolean;
+    [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+    transcript: string;
+    confidence: number;
 }
 
 interface SpeechRecognition extends EventTarget {
@@ -71,8 +84,9 @@ export function createTranscriptionService(): TranscriptionService {
                 recognition.onresult = (event: SpeechRecognitionEvent) => {
                     let finalTranscript = '';
                     for (let i = event.resultIndex; i < event.results.length; i++) {
-                        const transcriptPart = event.results[i][0].transcript;
-                        if (event.results[i].isFinal) {
+                        const result = event.results[i];
+                        const transcriptPart = result[0].transcript;
+                        if (result.isFinal) {
                             finalTranscript += transcriptPart + ' ';
                         }
                     }

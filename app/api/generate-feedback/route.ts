@@ -141,10 +141,11 @@ Focus on providing actionable, constructive feedback that helps the candidate im
         
         return NextResponse.json({ feedback });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to generate feedback';
         console.error('Error generating feedback:', error);
         return NextResponse.json({
-            error: error.message || 'Failed to generate feedback'
+            error: errorMessage
         }, { status: 500 });
     }
 }

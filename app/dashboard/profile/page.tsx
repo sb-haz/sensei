@@ -20,22 +20,7 @@ export default function ProfilePage() {
   const supabase = createClient();
   const router = useRouter();
 
-  useEffect(() => {
-    loadProfile();
-  }, []);
-
-  // Debounced auto-save effect
-  useEffect(() => {
-    if (!profile || fullName === lastSavedName || loading) return;
-
-    const timeoutId = setTimeout(() => {
-      autoSave();
-    }, 1000); // Save 1 second after user stops typing
-
-    return () => clearTimeout(timeoutId);
-  }, [fullName, profile, lastSavedName, loading]);
-
-  const loadProfile = async () => {
+  const loadProfile = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -74,7 +59,7 @@ export default function ProfilePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase, router]);
 
   const autoSave = useCallback(async () => {
     if (!profile || saving) return;
@@ -103,6 +88,21 @@ export default function ProfilePage() {
       setSaving(false);
     }
   }, [fullName, profile, saving, supabase]);
+
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
+
+  // Debounced auto-save effect
+  useEffect(() => {
+    if (!profile || fullName === lastSavedName || loading) return;
+
+    const timeoutId = setTimeout(() => {
+      autoSave();
+    }, 1000); // Save 1 second after user stops typing
+
+    return () => clearTimeout(timeoutId);
+  }, [fullName, profile, lastSavedName, loading, autoSave]);
 
   if (loading) {
     return (

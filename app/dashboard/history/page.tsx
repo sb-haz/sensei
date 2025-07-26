@@ -2,6 +2,25 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 
+interface InterviewTemplate {
+  name: string;
+  company: string;
+  role: string;
+  level: string;
+  difficulty: string;
+  topic: string;
+}
+
+interface InterviewRaw {
+  id: number;
+  status: string;
+  overall_score: number;
+  started_at: string;
+  completed_at: string;
+  total_duration_minutes: number;
+  interview_templates: InterviewTemplate | InterviewTemplate[] | null;
+}
+
 interface Interview {
   id: number;
   status: string;
@@ -9,14 +28,7 @@ interface Interview {
   started_at: string;
   completed_at: string;
   total_duration_minutes: number;
-  interview_templates: {
-    name: string;
-    company: string;
-    role: string;
-    level: string;
-    difficulty: string;
-    topic: string;
-  } | null;
+  interview_templates: InterviewTemplate | null;
 }
 
 export default async function HistoryPage() {
@@ -47,8 +59,8 @@ export default async function HistoryPage() {
   `)
   .order("started_at", { ascending: false });
 
-const interviews =
-  interviewsRaw?.map((interview: any) => ({
+const interviews: Interview[] =
+  interviewsRaw?.map((interview: InterviewRaw) => ({
     ...interview,
     interview_templates: Array.isArray(interview.interview_templates)
       ? interview.interview_templates[0] || null

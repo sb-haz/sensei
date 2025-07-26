@@ -43,8 +43,6 @@ export default function InterviewPage() {
 
     // State management
     const [isMicEnabled, setIsMicEnabled] = useState(false);
-    const [isCameraEnabled, setIsCameraEnabled] = useState(false);
-    const [isPaused, setIsPaused] = useState(false);
     const [showPermissions, setShowPermissions] = useState(true);
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [elapsedTime, setElapsedTime] = useState('00:00');
@@ -59,8 +57,6 @@ export default function InterviewPage() {
         questions: [],
         startTime: new Date()
     });
-    const [feedback, setFeedback] = useState<any>(null);
-    const [showFeedback, setShowFeedback] = useState(false);
     const [userFullName, setUserFullName] = useState<string>('');
 
     // Load user's full name for personalization
@@ -97,12 +93,14 @@ export default function InterviewPage() {
 
     // Initialize transcription service
     useEffect(() => {
-        transcriptionService.current.onTranscriptionResult((transcript) => {
+        const service = transcriptionService.current;
+        
+        service.onTranscriptionResult((transcript) => {
             setAnswer(transcript);
         });
 
         return () => {
-            transcriptionService.current.stopTranscription();
+            service.stopTranscription();
         };
     }, []);
 
@@ -165,92 +163,6 @@ export default function InterviewPage() {
 
         loadTemplate();
     }, []);
-
-    // Set up media devices
-    useEffect(() => {
-        const setupMedia = async () => {
-            try {
-                // Try to get both video and audio, but don't fail if they're not available
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({
-                        video: true,
-                        audio: true
-                    });
-                    if (videoRef.current) {
-                        videoRef.current.srcObject = stream;
-                        videoRef.current.muted = true;
-                    }
-                    setStream(stream);
-                    setIsMicEnabled(true);
-                    setIsCameraEnabled(true);
-                } catch (mediaError) {
-                    console.log('Media devices not available:', mediaError);
-                    // Try audio only if both failed
-                    try {
-                        const audioStream = await navigator.mediaDevices.getUserMedia({
-                            audio: true
-                        });
-                        setStream(audioStream);
-                        setIsMicEnabled(true);
-                    } catch (audioError) {
-                        console.log('Audio not available:', audioError);
-                    }
-                }
-            } catch (err) {
-                console.error('Failed to setup interview:', err);
-            }
-        };
-
-        setupMedia();
-
-        return () => {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-            }
-        };
-    }, []);
-
-    // Toggle microphone
-    const toggleMic = async () => {
-        try {
-            if (stream) {
-                const audioTracks = stream.getAudioTracks();
-                audioTracks.forEach((track: MediaStreamTrack) => {
-                    track.enabled = !isMicEnabled;
-                });
-                setIsMicEnabled(!isMicEnabled);
-            } else if (!isMicEnabled) {
-                const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                setStream(mediaStream);
-                setIsMicEnabled(true);
-            }
-        } catch (err) {
-            console.error('Failed to toggle microphone:', err);
-        }
-    };
-
-    // Toggle camera
-    const toggleCamera = async () => {
-        try {
-            if (stream) {
-                const videoTracks = stream.getVideoTracks();
-                videoTracks.forEach((track: MediaStreamTrack) => {
-                    track.enabled = !isCameraEnabled;
-                });
-                setIsCameraEnabled(!isCameraEnabled);
-            } else if (!isCameraEnabled) {
-                const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
-                setStream(mediaStream);
-                setIsCameraEnabled(true);
-                if (videoRef.current) {
-                    videoRef.current.srcObject = mediaStream;
-                    videoRef.current.play();
-                }
-            }
-        } catch (err) {
-            console.error('Failed to toggle camera:', err);
-        }
-    };
 
     // Fetch next question
     const fetchNextQuestion = async (prevQuestions = interview.questions) => {
@@ -504,8 +416,7 @@ export default function InterviewPage() {
                 }
 
                 const feedback = await feedbackResponse.json();
-                setFeedback(feedback);
-                setShowFeedback(true);
+                console.log('Feedback generated:', feedback);
             }
 
             // Stop all media tracks
@@ -580,7 +491,10 @@ export default function InterviewPage() {
 
             <div className="flex flex-col lg:flex-row gap-6 p-6 flex-1">
                 <div className="flex-1 flex flex-col gap-6">
-                    <VideoGrid videoRef={videoRef as React.RefObject<HTMLVideoElement>} className="flex-1" />
+                    <VideoGrid 
+                        videoRef={videoRef as React.RefObject<HTMLVideoElement>} 
+                        className="flex-1"
+                    />
                     <QuestionAnswerBox
                         currentQuestion={currentQuestion}
                         answer={answer}

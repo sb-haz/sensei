@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 
 interface UserSettings {
@@ -34,11 +33,7 @@ export default function SettingsPage() {
 
   const supabase = createClient();
 
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -71,7 +66,11 @@ export default function SettingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase]);
+
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
 
   const saveSettings = async () => {
     setSaving(true);
@@ -103,7 +102,7 @@ export default function SettingsPage() {
     }
   };
 
-  const handleChange = (key: keyof UserSettings, value: any) => {
+  const handleChange = (key: keyof UserSettings, value: string | number | boolean) => {
     setSettings(prev => ({
       ...prev,
       [key]: value

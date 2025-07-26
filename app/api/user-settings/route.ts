@@ -35,10 +35,11 @@ export async function GET() {
 
         return NextResponse.json(settings || defaultSettings);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to fetch user settings';
         console.error('Error in user-settings route:', error);
         return NextResponse.json({
-            error: error.message || 'Failed to fetch user settings'
+            error: errorMessage
         }, { status: 500 });
     }
 }

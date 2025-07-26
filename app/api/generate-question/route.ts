@@ -131,10 +131,11 @@ CRITICAL: Questions must be EXTREMELY short - maximum 10 words. No long explanat
 
         return NextResponse.json({ question: data.choices[0].message.content });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to generate question';
         console.error('Error in generate-question route:', error);
         return NextResponse.json({
-            error: error.message || 'Failed to generate question'
+            error: errorMessage
         }, { status: 500 });
     }
 }

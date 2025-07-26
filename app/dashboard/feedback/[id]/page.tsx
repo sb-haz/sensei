@@ -22,7 +22,7 @@ interface InterviewWithFeedback {
   id: number;
   status: string;
   overall_score: number;
-  ai_feedback: any;
+  ai_feedback: Record<string, unknown> | null;
   feedback_summary: string;
   strengths: string[];
   improvements: string[];
@@ -95,12 +95,6 @@ export default async function FeedbackPage({ params }: { params: Promise<{ id: s
       hour: "2-digit",
       minute: "2-digit",
     });
-  };
-
-  const getScoreColor = (score: number) => {
-    if (score >= 8) return "text-green-600 bg-green-50";
-    if (score >= 6) return "text-yellow-600 bg-yellow-50";
-    return "text-red-600 bg-red-50";
   };
 
   const getOverallScoreColor = (score: number) => {
@@ -260,7 +254,7 @@ export default async function FeedbackPage({ params }: { params: Promise<{ id: s
         </div>
 
         <div className="space-y-6">
-          {typedInterview.answers?.map((answer: AnswerItem, index: number) => (
+          {typedInterview.answers?.map((answer: AnswerItem) => (
             <div key={answer.id} className="bg-card border border-border rounded-2xl p-8">
               <div className="space-y-6">
                 <div className="flex items-center gap-3">

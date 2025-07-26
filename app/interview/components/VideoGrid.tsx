@@ -1,4 +1,5 @@
-import { RefObject, useEffect, useState } from 'react';
+import React, { useEffect, useState, RefObject } from 'react';
+import Image from 'next/image';
 
 interface VideoGridProps {
     videoRef: RefObject<HTMLVideoElement>;
@@ -28,16 +29,36 @@ export default function VideoGrid({ videoRef, className }: VideoGridProps) {
         fetchAvatar();
     }, []);
 
+    // Simple webcam setup
+    useEffect(() => {
+        const getWebcam = async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: true
+                });
+                if (videoRef.current) {
+                    videoRef.current.srcObject = stream;
+                }
+            } catch (err) {
+                console.error('Error accessing webcam:', err);
+            }
+        };
+
+        getWebcam();
+    }, [videoRef]);
+
     return (
         <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${className}`}>
             {/* Interviewer Panel */}
             <div className="relative bg-card border border-border rounded-2xl overflow-hidden h-[280px] flex items-center justify-center">
                 {interviewerAvatar && !avatarError ? (
                     <>
-                        <img 
+                        <Image 
                             src={interviewerAvatar}
                             alt="AI Interviewer"
-                            className="w-full h-full object-cover"
+                            fill
+                            className="object-cover"
                             onError={() => setAvatarError(true)}
                         />
                         <div className="absolute inset-0 bg-black/10" />
@@ -55,30 +76,20 @@ export default function VideoGrid({ videoRef, className }: VideoGridProps) {
                 </div>
             </div>
 
-            {/* Candidate Panel */}
-            <div className="relative bg-card border border-border rounded-2xl h-[280px] overflow-hidden">
+            {/* Candidate Panel - SIMPLE WEBCAM */}
+            <div className="relative rounded-2xl h-[280px] overflow-hidden">
                 <video
-                    key="candidate-video"
                     ref={videoRef}
                     autoPlay
                     playsInline
                     muted
                     className="w-full h-full object-cover"
-                    style={{ transform: 'scaleX(-1)' }}
+                    style={{ transform: 'scaleX(-1)', backgroundColor: '#000' }}
                 />
                 <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
                     <div className="flex items-center gap-3">
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                         <p className="text-white font-medium">You</p>
-                    </div>
-                </div>
-                {/* No video fallback */}
-                <div className="absolute inset-0 flex items-center justify-center bg-muted/50 text-muted-foreground" style={{ display: 'none' }}>
-                    <div className="text-center space-y-3">
-                        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-                            <span className="text-2xl">👤</span>
-                        </div>
-                        <p className="text-sm">Camera not available</p>
                     </div>
                 </div>
             </div>
