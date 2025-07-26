@@ -44,7 +44,6 @@ export default function InterviewPage() {
     // State management
     const [isMicEnabled, setIsMicEnabled] = useState(false);
     const [showPermissions, setShowPermissions] = useState(true);
-    const [stream, setStream] = useState<MediaStream | null>(null);
     const [elapsedTime, setElapsedTime] = useState('00:00');
     const [isRecording, setIsRecording] = useState(false);
     const [answer, setAnswer] = useState('');
@@ -417,11 +416,6 @@ export default function InterviewPage() {
 
                 const feedback = await feedbackResponse.json();
                 console.log('Feedback generated:', feedback);
-            }
-
-            // Stop all media tracks
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
             }
 
             // Navigate to dashboard
