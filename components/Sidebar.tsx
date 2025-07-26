@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Brain } from 'lucide-react';
 
 export function Sidebar() {
     const pathname = usePathname();
@@ -27,8 +28,11 @@ export function Sidebar() {
         <aside className="fixed left-0 top-0 h-full w-72 bg-card border-r border-border z-40">
             <div className="p-6">
                 <div className="mb-8">
-                    <h2 className="text-xl font-bold text-foreground">Sensei</h2>
-                    <p className="text-sm text-muted-foreground mt-1">Interview Preparation Platform</p>
+                    <div className="flex items-center gap-3 mb-2">
+                        <Brain className="w-8 h-8 text-blue-500" />
+                        <h2 className="text-xl font-bold text-foreground">Sensei</h2>
+                    </div>
+                    <p className="text-sm text-muted-foreground">Interview Preparation Platform</p>
                 </div>
                 <nav className="space-y-1">
                     {navItems.map((item) => (

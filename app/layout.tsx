@@ -9,7 +9,10 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "Sensei - AI-Powered Interview Prep",
+  title: {
+    template: "%s | Sensei",
+    default: "Sensei - AI-Powered Interview Prep"
+  },
   description: "Ace interviews with AI guidance and real-time feedback",
   icons: {
     icon: "/favicon.ico",
