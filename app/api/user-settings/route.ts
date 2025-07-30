@@ -36,10 +36,6 @@ export async function GET() {
         return NextResponse.json(settings || defaultSettings);
 
     } catch (error: unknown) {
-<<<<<<< HEAD
-=======
-        const errorMessage = error instanceof Error ? error.message : 'Failed to fetch user settings';
->>>>>>> c58e33d9f585021b1060b94cce653f127c797081
         console.error('Error in user-settings route:', error);
         const errorMessage = error instanceof Error ? error.message : 'Failed to fetch user settings';
         return NextResponse.json({

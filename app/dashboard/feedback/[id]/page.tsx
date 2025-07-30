@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import FeedbackContent from "./FeedbackContent";
+import Link from "next/link";
 
 interface InterviewTemplate {
   name: string;
@@ -22,11 +22,7 @@ interface InterviewWithFeedback {
   id: number;
   status: string;
   overall_score: number;
-<<<<<<< HEAD
   ai_feedback: Record<string, unknown>;
-=======
-  ai_feedback: Record<string, unknown> | null;
->>>>>>> c58e33d9f585021b1060b94cce653f127c797081
   feedback_summary: string;
   strengths: string[];
   improvements: string[];
@@ -91,7 +87,6 @@ export default async function FeedbackPage({ params }: { params: Promise<{ id: s
     answers: interview.answers || [],
   };
 
-<<<<<<< HEAD
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
@@ -308,7 +303,3 @@ export default async function FeedbackPage({ params }: { params: Promise<{ id: s
     </div>
   );
 }
-=======
-  return <FeedbackContent interview={typedInterview} />;
-}
->>>>>>> c58e33d9f585021b1060b94cce653f127c797081

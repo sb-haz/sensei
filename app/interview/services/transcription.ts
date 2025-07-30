@@ -5,19 +5,6 @@ interface TranscriptionService {
 }
 
 // Speech recognition type declarations
-interface SpeechRecognitionResult {
-    isFinal: boolean;
-    [index: number]: {
-        transcript: string;
-        confidence: number;
-    };
-}
-
-interface SpeechRecognitionResultList {
-    [index: number]: SpeechRecognitionResult;
-    length: number;
-}
-
 interface SpeechRecognitionEvent extends Event {
     results: SpeechRecognitionResultList;
     resultIndex: number;

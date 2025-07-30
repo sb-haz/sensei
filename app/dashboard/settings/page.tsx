@@ -114,11 +114,7 @@ export default function SettingsPage() {
     }
   };
 
-<<<<<<< HEAD
-  const handleChange = (key: keyof UserSettings, value: string | number | boolean) => {
-=======
   const handleChange = async (key: keyof UserSettings, value: string | number | boolean) => {
->>>>>>> c58e33d9f585021b1060b94cce653f127c797081
     setSettings(prev => ({
       ...prev,
       [key]: value

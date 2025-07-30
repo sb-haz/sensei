@@ -142,10 +142,6 @@ Focus on providing actionable, constructive feedback that helps the candidate im
         return NextResponse.json({ feedback });
 
     } catch (error: unknown) {
-<<<<<<< HEAD
-=======
-        const errorMessage = error instanceof Error ? error.message : 'Failed to generate feedback';
->>>>>>> c58e33d9f585021b1060b94cce653f127c797081
         console.error('Error generating feedback:', error);
         const errorMessage = error instanceof Error ? error.message : 'Failed to generate feedback';
         return NextResponse.json({

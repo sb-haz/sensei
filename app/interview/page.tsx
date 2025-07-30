@@ -46,6 +46,7 @@ export default function InterviewPage() {
 
     // State management
     const [isMicEnabled, setIsMicEnabled] = useState(false);
+    const [stream, setStream] = useState<MediaStream | null>(null);
     const [showPermissions, setShowPermissions] = useState(true);
     const [elapsedTime, setElapsedTime] = useState('00:00');
     const [isRecording, setIsRecording] = useState(false);
@@ -178,7 +179,6 @@ export default function InterviewPage() {
         loadTemplate();
     }, []);
 
-<<<<<<< HEAD
     // Set up media devices
     useEffect(() => {
         const setupMedia = async () => {
@@ -224,8 +224,6 @@ export default function InterviewPage() {
         };
     }, []);
 
-=======
->>>>>>> c58e33d9f585021b1060b94cce653f127c797081
     // Fetch next question
     const fetchNextQuestion = async (prevQuestions = interview.questions) => {
         if (prevQuestions.length >= (template?.number_of_questions || 4)) {
@@ -525,15 +523,12 @@ export default function InterviewPage() {
 
                 const feedback = await feedbackResponse.json();
                 console.log('Feedback generated:', feedback);
-<<<<<<< HEAD
                 // Note: feedback display logic would be handled elsewhere
             }
 
             // Stop all media tracks
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
-=======
->>>>>>> c58e33d9f585021b1060b94cce653f127c797081
             }
 
             // Navigate to dashboard
@@ -631,17 +626,11 @@ export default function InterviewPage() {
 
             <div className="flex flex-col lg:flex-row gap-6 p-6 flex-1">
                 <div className="flex-1 flex flex-col gap-6">
-<<<<<<< HEAD
                     <VideoGridWithAvatar 
                         videoRef={videoRef as React.RefObject<HTMLVideoElement>} 
                         className="flex-1" 
                         isInterviewerSpeaking={isInterviewerSpeaking}
                         onInterviewerSpeakingChange={setIsInterviewerSpeaking}
-=======
-                    <VideoGrid 
-                        videoRef={videoRef as React.RefObject<HTMLVideoElement>} 
-                        className="flex-1"
->>>>>>> c58e33d9f585021b1060b94cce653f127c797081
                     />
                     <QuestionAnswerBox
                         currentQuestion={currentQuestion}
