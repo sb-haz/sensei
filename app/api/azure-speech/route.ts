@@ -1,33 +1,35 @@
 // Server-side Azure Speech Service API
 import { NextRequest, NextResponse } from 'next/server';
+import { logger } from '@/lib/logger';
+import { withErrorHandling } from '@/lib/error-handling';
+import { config, validateServiceConfig } from '@/lib/config';
 
 export async function POST(request: NextRequest) {
-    try {
+    return withErrorHandling(async () => {
         const { action, ...params } = await request.json();
 
-        // Get Azure credentials from server-side environment variables
-        const azureKey = process.env.AZURE_SPEECH_KEY;
-        const azureRegion = process.env.AZURE_SPEECH_REGION;
-        const azureEndpoint = process.env.AZURE_SPEECH_ENDPOINT;
-
-        if (!azureKey || !azureRegion) {
+        // Validate Azure configuration
+        if (!validateServiceConfig('azure')) {
+            logger.error('Azure Speech Service not configured properly');
             return NextResponse.json(
                 { error: 'Azure Speech Service not configured' },
                 { status: 500 }
             );
         }
 
+        const { azureSpeechKey, azureSpeechRegion, azureSpeechEndpoint } = config;
+
         switch (action) {
             case 'getIceServerToken':
-                return await getIceServerToken(azureKey, azureRegion, params.privateEndpoint);
+                return await getIceServerToken(azureSpeechKey!, azureSpeechRegion!, params.privateEndpoint);
             
             case 'getAuthToken':
-                return await getAuthToken(azureKey, azureRegion);
+                return await getAuthToken(azureSpeechKey!, azureSpeechRegion!);
             
             case 'getSpeechConfig':
                 return NextResponse.json({
-                    region: azureRegion,
-                    endpoint: azureEndpoint,
+                    region: azureSpeechRegion,
+                    endpoint: azureSpeechEndpoint,
                     // Don't return the key - client will get it via token
                 });
 
@@ -37,19 +39,14 @@ export async function POST(request: NextRequest) {
                     { status: 400 }
                 );
         }
-    } catch (error) {
-        console.error('Azure Speech API error:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Internal server error';
-        return NextResponse.json(
-            { error: errorMessage },
-            { status: 500 }
-        );
-    }
+    }, 'azure-speech')();
 }
 
 async function getAuthToken(azureKey: string, azureRegion: string) {
     const url = `https://${azureRegion}.api.cognitive.microsoft.com/sts/v1.0/issuetoken`;
 
+    logger.api(`Getting auth token from ${url}`);
+    
     const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -59,10 +56,12 @@ async function getAuthToken(azureKey: string, azureRegion: string) {
     });
 
     if (!response.ok) {
+        logger.error(`Failed to get auth token: ${response.status}`);
         throw new Error(`Failed to get auth token: ${response.status}`);
     }
 
     const token = await response.text();
+    logger.info('Auth token obtained successfully');
     
     return NextResponse.json({
         token,
@@ -75,6 +74,8 @@ async function getIceServerToken(azureKey: string, azureRegion: string, privateE
         ? `https://${privateEndpoint}/tts/cognitiveservices/avatar/relay/token/v1`
         : `https://${azureRegion}.tts.speech.microsoft.com/cognitiveservices/avatar/relay/token/v1`;
 
+    logger.api(`Getting ICE server token from ${url}`);
+
     const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -83,10 +84,12 @@ async function getIceServerToken(azureKey: string, azureRegion: string, privateE
     });
 
     if (!response.ok) {
+        logger.error(`Failed to get ICE server token: ${response.status}`);
         throw new Error(`Failed to get ICE server token: ${response.status}`);
     }
 
     const data = await response.json();
+    logger.info('ICE server token obtained successfully');
     
     return NextResponse.json({
         urls: data.Urls,

@@ -1,37 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import Link from "next/link";
 import { Button } from "./ui/button";
 import { CurrentUserAvatar } from '@/components/current-user-avatar';
 import { LogoutButton } from '@/components/logout-button';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { Brain } from 'lucide-react';
-import type { User } from '@supabase/supabase-js';
+import { useAuth } from '@/hooks/use-auth';
 
 export function ClientNavbar() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const supabase = createClient();
-    
-    async function getUser() {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-      setLoading(false);
-    }
-
-    getUser();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+  const { user, loading } = useAuth();
 
   const AuthSection = () => {
     if (loading) {

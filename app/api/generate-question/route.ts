@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
+import { logger } from '@/lib/logger';
+import { withErrorHandling } from '@/lib/error-handling';
+import { validateServiceConfig } from '@/lib/config';
 
 export async function POST(request: Request) {
-    try {
-        if (!process.env.DEEPSEEK_API_KEY) {
+    return withErrorHandling(async () => {
+        if (!validateServiceConfig('deepseek')) {
             throw new Error('API key not configured');
         }
 
@@ -125,17 +128,10 @@ CRITICAL: Questions must be EXTREMELY short - maximum 10 words. No long explanat
         const data = await deepseekResponse.json();
         
         if (!data.choices?.[0]?.message?.content) {
-            console.error('Invalid Deepseek response:', data);
+            logger.error('Invalid Deepseek response:', data);
             throw new Error('Invalid response format from Deepseek API');
         }
 
         return NextResponse.json({ question: data.choices[0].message.content });
-
-    } catch (error: unknown) {
-        console.error('Error in generate-question route:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Failed to generate question';
-        return NextResponse.json({
-            error: errorMessage
-        }, { status: 500 });
-    }
+    }, 'generate-question')();
 }

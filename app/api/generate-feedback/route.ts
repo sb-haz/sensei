@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { logger } from '@/lib/logger';
+import { withErrorHandling, handleSupabaseError } from '@/lib/error-handling';
 
 export async function POST(request: Request) {
-    try {
-        console.log('Generating feedback...'); // Debugging line
+    return withErrorHandling(async () => {
+        logger.api('Generating feedback...');
 
         // Check if the Deepseek API key is configured
         if (!process.env.DEEPSEEK_API_KEY) {
@@ -13,8 +15,7 @@ export async function POST(request: Request) {
         // Parse the request body
         const { userDetails, interviewHistory, template, interviewId, isEndOfInterview } = await request.json();
 
-        // Debugging: Log the request body
-        console.log('Request Body:', {
+        logger.debug('Request Body:', {
             userDetails,
             interviewHistory,
             template,
@@ -140,12 +141,5 @@ Focus on providing actionable, constructive feedback that helps the candidate im
         }
         
         return NextResponse.json({ feedback });
-
-    } catch (error: unknown) {
-        console.error('Error generating feedback:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Failed to generate feedback';
-        return NextResponse.json({
-            error: errorMessage
-        }, { status: 500 });
-    }
+    }, 'generate-feedback')();
 }

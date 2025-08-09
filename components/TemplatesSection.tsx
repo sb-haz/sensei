@@ -4,9 +4,9 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/use-auth';
 // @ts-expect-error - react-i18next types issue
 import { useTranslation } from 'react-i18next';
-import type { User } from '@supabase/supabase-js';
 
 interface Template {
   id: string;
@@ -20,18 +20,14 @@ interface Template {
 export function TemplatesSection() {
   const { t } = useTranslation();
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const { user } = useAuth(); // Use centralized auth hook
 
   useEffect(() => {
-    const supabase = createClient();
-    
-    async function loadData() {
-      // Check authentication
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-
+    const loadTemplates = async () => {
+      const supabase = createClient();
+      
       // Load templates
       const { data: templatesData } = await supabase
         .from('interview_templates')
@@ -40,9 +36,9 @@ export function TemplatesSection() {
       
       setTemplates(templatesData || []);
       setLoading(false);
-    }
+    };
 
-    loadData();
+    loadTemplates();
   }, []);
 
   const cardConfigs = [

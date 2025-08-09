@@ -1,6 +1,8 @@
 // Azure Speech Avatar Service
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import { logger } from '@/lib/logger';
+
 // Note: Using 'any' types for Azure Speech SDK as it's an external library
 // loaded dynamically from CDN without proper TypeScript definitions
 declare global {
@@ -56,7 +58,7 @@ export class AzureAvatarService {
 
     public async initialize(): Promise<void> {
         return new Promise((resolve, reject) => {
-            console.log('Starting Azure Avatar Service initialization...');
+            logger.avatar('Starting Azure Avatar Service initialization...');
             
             if (typeof window.SpeechSDK === 'undefined') {
                 console.log('Loading Azure Speech SDK...');
