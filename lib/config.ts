@@ -13,6 +13,11 @@ interface Config {
   azureSpeechRegion?: string;
   azureSpeechEndpoint?: string;
   
+  // Azure OpenAI
+  azureOpenAIEndpoint?: string;
+  azureOpenAIApiKey?: string;
+  azureOpenAIDeploymentName?: string;
+  
   // AI APIs
   deepseekApiKey?: string;
   
@@ -41,6 +46,9 @@ export const config: Config = {
   azureSpeechKey: getEnvVar('AZURE_SPEECH_KEY', false),
   azureSpeechRegion: getEnvVar('AZURE_SPEECH_REGION', false),
   azureSpeechEndpoint: getEnvVar('AZURE_SPEECH_ENDPOINT', false),
+  azureOpenAIEndpoint: getEnvVar('AZURE_OPENAI_ENDPOINT', false),
+  azureOpenAIApiKey: getEnvVar('AZURE_OPENAI_API_KEY', false),
+  azureOpenAIDeploymentName: getEnvVar('AZURE_OPENAI_DEPLOYMENT_NAME', false),
   deepseekApiKey: getEnvVar('DEEPSEEK_API_KEY', false),
   
   // App environment
@@ -52,12 +60,14 @@ export const config: Config = {
 /**
  * Validates that required services are configured
  */
-export function validateServiceConfig(service: 'azure' | 'deepseek'): boolean {
+export function validateServiceConfig(service: 'azure' | 'deepseek' | 'azureOpenAI'): boolean {
   switch (service) {
     case 'azure':
       return !!(config.azureSpeechKey && config.azureSpeechRegion);
     case 'deepseek':
       return !!config.deepseekApiKey;
+    case 'azureOpenAI':
+      return !!(config.azureOpenAIEndpoint && config.azureOpenAIApiKey && config.azureOpenAIDeploymentName);
     default:
       return false;
   }

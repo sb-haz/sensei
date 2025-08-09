@@ -12,6 +12,17 @@ declare global {
       error: string | null;
     };
     __onAvatarSpeakingStart?: (text: string) => void;
+    
+    // New chat avatar functions
+    __chatAvatarSendMessage?: (userMessage?: string) => Promise<void>;
+    __chatAvatarStop?: () => Promise<void>;
+    __chatAvatarStatus?: () => {
+      isInitialized: boolean;
+      isSessionActive: boolean;
+      isReady: boolean;
+      isSpeaking: boolean;
+      error: string | null;
+    };
   }
 }
 

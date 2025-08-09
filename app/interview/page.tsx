@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import VideoGridWithAvatar from './components/VideoGridWithAvatar';
+import VideoGridWithChatAvatar from './components/VideoGridWithChatAvatar';
 import ControlPanel from './components/ControlPanel';
 import QuestionAnswerBox from './components/QuestionAnswerBox';
 import InterviewHeader from './components/InterviewHeader';
@@ -224,19 +224,19 @@ export default function InterviewPage() {
         };
     }, []);
 
-    // Fetch next question
+    // Fetch next question using Azure Chat Avatar
     const fetchNextQuestion = async (prevQuestions = interview.questions) => {
         if (prevQuestions.length >= (template?.number_of_questions || 4)) {
             await handleEndInterview();
             return true;
         }
 
-        setCurrentQuestion(''); // Clear current question while loading
-        setAnswer(''); // Clear previous answer
+        setCurrentQuestion('The interviewer is preparing your next question...');
+        setAnswer('');
         setLoading(true);
 
         try {
-            console.log('Fetching next question...', {
+            console.log('Fetching next question via chat avatar...', {
                 questionCount: prevQuestions.length,
                 template: template
             });
@@ -244,8 +244,6 @@ export default function InterviewPage() {
             // First, create an interview record if we don't have one yet
             if (!interview.id && template?.id) {
                 const supabase = createClient();
-
-                // Get the current user first
                 const { data: { user }, error: userError } = await supabase.auth.getUser();
 
                 if (userError || !user) {
@@ -272,112 +270,23 @@ export default function InterviewPage() {
                 setInterview(prev => ({ ...prev, id: interviewData.id }));
             }
 
-            const response = await fetch('/api/generate-question', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    userDetails: {
-                        name: userFullName || 'there', // Use full name if available, otherwise default greeting
-                        job_info: {
-                            title: template?.role || 'Software Engineer',
-                            level: template?.level,
-                            company: template?.company
-                        }
-                    },
-                    interviewHistory: prevQuestions,
-                    template: template,
-                    userSettings: settings, // Pass user settings to API
-                }),
-            });
-
-            const data = await response.json();
-
-            // Check for API-level errors
-            if (!response.ok) {
-                console.error('API request failed:', {
-                    status: response.status,
-                    statusText: response.statusText,
-                    data
-                });
-                throw new Error(
-                    data.error ||
-                    `API request failed with status ${response.status}`
-                );
-            }
-
-            // Check for application-level errors
-            if (data.error) {
-                console.error('Application error:', data.error);
-                throw new Error(`Application error: ${data.error}`);
-            }
-
-            // Validate response data
-            if (!data.question) {
-                console.error('Invalid response:', data);
-                throw new Error('Invalid API response: missing question');
-            }
-
-            console.log('Successfully fetched question:', data.question);
-
-            // Set the question immediately since we're not using pending state anymore
-            setCurrentQuestion('The interviewer is preparing to ask you a question...');
-            setAnswer('');
-            
-            console.log('🔄 Set currentQuestion preparation message');
-
-            // Use Azure Avatar to speak the question
-            try {
-                // Always cancel any browser speech synthesis first
-                window.speechSynthesis.cancel();
+            // Use the new chat avatar system to get and speak the question
+            if (window.__chatAvatarSendMessage) {
+                console.log('🎤 Sending message to chat avatar for question generation');
                 
-                console.log('🔍 Checking Azure Avatar availability...');
-                console.log('__avatarSpeak function exists:', typeof window.__avatarSpeak);
-                console.log('__avatarStatus function exists:', typeof window.__avatarStatus);
+                // For first question, don't send user message, for subsequent questions send undefined to continue
+                const userMessage = prevQuestions.length === 0 ? undefined : undefined;
                 
-                if (window.__avatarStatus) {
-                    const status = window.__avatarStatus();
-                    console.log('🔍 Avatar status:', status);
-                }
+                await window.__chatAvatarSendMessage(userMessage);
+                console.log('✅ Chat avatar message sent successfully');
                 
-                if (window.__avatarSpeak) {
-                    console.log('🎤 Attempting to speak question via Azure Avatar');
-                    console.log('🎤 Using data.question directly:', data.question.substring(0, 100) + (data.question.length > 100 ? '...' : ''));
-                    await window.__avatarSpeak(data.question);
-                    console.log('✅ Azure Avatar speech completed successfully');
-                } else {
-                    console.warn('❌ Azure Avatar __avatarSpeak function not available, falling back to browser speech synthesis');
-                    // Fallback to browser speech synthesis
-                    setCurrentQuestion(data.question); // Show question text
-                    setIsInterviewerSpeaking(true);
-                    const utterance = new SpeechSynthesisUtterance(data.question);
-                    window.speechSynthesis.cancel();
-                    utterance.onend = () => setIsInterviewerSpeaking(false);
-                    window.speechSynthesis.speak(utterance);
-                }
-            } catch (speakError) {
-                console.error('❌ Failed to speak question via Azure Avatar, falling back to browser speech:', speakError);
-                // Fallback to browser speech synthesis on error
-                setCurrentQuestion(data.question); // Show question text
-                setIsInterviewerSpeaking(true);
-                const utterance = new SpeechSynthesisUtterance(data.question);
-                window.speechSynthesis.cancel();
-                utterance.onend = () => setIsInterviewerSpeaking(false);
-                window.speechSynthesis.speak(utterance);
-            }
-
-            // Wait a moment to ensure state is updated
-            await new Promise(resolve => setTimeout(resolve, 100));
-
-            // Verify the question was fetched successfully
-            if (data.question) {
                 return true;
             } else {
-                throw new Error('Question was not set properly');
+                throw new Error('Chat avatar system not available');
             }
+
         } catch (error) {
-            console.error('Failed to get next question:', error);
+            console.error('Failed to get next question via chat avatar:', error);
             setCurrentQuestion('Error: Failed to load question. Please try again.');
             return false;
         } finally {
@@ -394,7 +303,7 @@ export default function InterviewPage() {
         setIsRecording(false);
 
         try {
-            console.log('Saving answer...', {
+            console.log('Saving answer and getting next question via chat avatar...', {
                 currentQuestion,
                 answer: answer.trim(),
                 interviewId: interview.id
@@ -406,7 +315,6 @@ export default function InterviewPage() {
                 answer: answer.trim()
             }];
 
-            // Log the updated questions array
             console.log('Updated questions array:', newQuestions);
 
             // Update interview state first
@@ -441,14 +349,28 @@ export default function InterviewPage() {
                 console.warn('No interview ID available, answer only saved in local state');
             }
 
-            // Clear current state before fetching next question
-            setCurrentQuestion('');
+            // Clear current state
+            setCurrentQuestion('The interviewer is processing your answer...');
             setAnswer('');
 
-            // Then fetch the next question with the updated questions array
-            await fetchNextQuestion(newQuestions);
+            // Check if this is the last question
+            if (newQuestions.length >= (template?.number_of_questions || 4)) {
+                await handleEndInterview();
+                return;
+            }
+
+            // Send the user's answer to the chat avatar to get the next question
+            if (window.__chatAvatarSendMessage) {
+                console.log('🎤 Sending user answer to chat avatar for next question');
+                await window.__chatAvatarSendMessage(answer.trim());
+                console.log('✅ User answer sent to chat avatar successfully');
+            } else {
+                throw new Error('Chat avatar system not available');
+            }
+
         } catch (error) {
-            console.error('Failed to save answer:', error);
+            console.error('Failed to save answer and get next question:', error);
+            setCurrentQuestion('Error: Failed to process your answer. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -459,16 +381,16 @@ export default function InterviewPage() {
         try {
             setLoading(true);
 
-            // Stop avatar speaking if active
+            // Stop chat avatar speaking if active
             try {
-                if (window.__avatarStopSpeaking) {
-                    await window.__avatarStopSpeaking();
+                if (window.__chatAvatarStop) {
+                    await window.__chatAvatarStop();
                 }
                 // Also stop browser speech synthesis as fallback
                 window.speechSynthesis.cancel();
                 setIsInterviewerSpeaking(false);
             } catch (error) {
-                console.error('Error stopping speech:', error);
+                console.error('Error stopping chat avatar speech:', error);
             }
 
             if (interview.id) {
@@ -546,12 +468,21 @@ export default function InterviewPage() {
         if (!currentQuestion.trim()) return;
 
         try {
-            if (window.__avatarSpeak) {
-                console.log('🔄 Repeating question via Azure Avatar');
-                await window.__avatarSpeak(currentQuestion);
+            // Use chat avatar to speak the current question
+            if (window.__chatAvatarSendMessage) {
+                console.log('🔄 Repeating question via chat avatar');
+                // Send empty message to make avatar repeat the current question
+                setCurrentQuestion('The interviewer is repeating the question...');
+                
+                // We'll use the chat avatar's speak functionality directly
+                // For now, fall back to browser speech synthesis for repeat
+                setIsInterviewerSpeaking(true);
+                const utterance = new SpeechSynthesisUtterance(currentQuestion);
+                window.speechSynthesis.cancel();
+                utterance.onend = () => setIsInterviewerSpeaking(false);
+                window.speechSynthesis.speak(utterance);
             } else {
                 console.log('🔄 Repeating question via browser speech synthesis');
-                // Fallback to browser speech synthesis
                 setIsInterviewerSpeaking(true);
                 const utterance = new SpeechSynthesisUtterance(currentQuestion);
                 window.speechSynthesis.cancel();
@@ -559,8 +490,7 @@ export default function InterviewPage() {
                 window.speechSynthesis.speak(utterance);
             }
         } catch (error) {
-            console.error('❌ Failed to repeat question via Azure Avatar, falling back to browser speech:', error);
-            // Fallback to browser speech synthesis on error
+            console.error('❌ Failed to repeat question:', error);
             setIsInterviewerSpeaking(true);
             const utterance = new SpeechSynthesisUtterance(currentQuestion);
             window.speechSynthesis.cancel();
@@ -602,13 +532,45 @@ export default function InterviewPage() {
                         <button
                             onClick={() => {
                                 setShowPermissions(false);
-                                // Start fetching the question after transitioning to the interview view
-                                setTimeout(() => {
-                                    fetchNextQuestion().catch(error => {
-                                        console.error('Failed to start interview:', error);
+                                // Start the interview with the chat avatar system
+                                const startInterview = async () => {
+                                    // Wait for chat avatar to be ready
+                                    let attempts = 0;
+                                    const maxAttempts = 20; // 10 seconds max
+                                    
+                                    while (attempts < maxAttempts) {
+                                        if (window.__chatAvatarStatus) {
+                                            const status = window.__chatAvatarStatus();
+                                            console.log(`🔍 Chat avatar status check ${attempts + 1}:`, status);
+                                            
+                                            if (status.isReady && window.__chatAvatarSendMessage) {
+                                                console.log('✅ Chat avatar is ready, starting interview');
+                                                try {
+                                                    await window.__chatAvatarSendMessage();
+                                                    return;
+                                                } catch (error) {
+                                                    console.error('Failed to start interview with chat avatar:', error);
+                                                    setCurrentQuestion('Error starting interview. Please try again.');
+                                                    return;
+                                                }
+                                            }
+                                        }
+                                        
+                                        attempts++;
+                                        await new Promise(resolve => setTimeout(resolve, 500));
+                                    }
+                                    
+                                    // If we get here, chat avatar didn't become ready in time
+                                    console.warn('⚠️ Chat avatar not ready after 10 seconds, falling back to old system');
+                                    try {
+                                        await fetchNextQuestion();
+                                    } catch (error) {
+                                        console.error('Failed to start interview with fallback:', error);
                                         setCurrentQuestion('Error starting interview. Please try again.');
-                                    });
-                                }, 0);
+                                    }
+                                };
+                                
+                                startInterview();
                             }}
                             className="w-full bg-primary text-primary-foreground py-3 rounded-full font-medium hover:bg-primary/90 transition-all duration-200"
                         >
@@ -620,17 +582,41 @@ export default function InterviewPage() {
         );
     }
 
+    // Wrapper function to log question updates
+    const handleQuestionUpdate = (message: string) => {
+        console.log('📝 Question updated in main display:', message.substring(0, 100) + '...');
+        setCurrentQuestion(message);
+        
+        // Clear loading state as soon as we start receiving the question
+        if (loading && message.trim()) {
+            console.log('🔄 Clearing loading state - question started streaming');
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-background flex flex-col">
             <InterviewHeader elapsedTime={elapsedTime} />
 
             <div className="flex flex-col lg:flex-row gap-6 p-6 flex-1">
                 <div className="flex-1 flex flex-col gap-6">
-                    <VideoGridWithAvatar 
+                    <VideoGridWithChatAvatar 
                         videoRef={videoRef as React.RefObject<HTMLVideoElement>} 
                         className="flex-1" 
                         isInterviewerSpeaking={isInterviewerSpeaking}
                         onInterviewerSpeakingChange={setIsInterviewerSpeaking}
+                        onMessageReceived={handleQuestionUpdate}
+                        userDetails={{
+                            name: userFullName || 'there',
+                            job_info: {
+                                title: template?.role || 'Software Engineer',
+                                level: template?.level,
+                                company: template?.company
+                            }
+                        }}
+                        interviewHistory={interview.questions}
+                        settings={settings}
+                        template={template}
                     />
                     <QuestionAnswerBox
                         currentQuestion={currentQuestion}
