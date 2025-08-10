@@ -15,6 +15,7 @@ declare global {
     
     // New chat avatar functions
     __chatAvatarSendMessage?: (userMessage?: string) => Promise<void>;
+    __chatAvatarSpeakCompletion?: (message: string) => Promise<void>;
     __chatAvatarStop?: () => Promise<void>;
     __chatAvatarStatus?: () => {
       isInitialized: boolean;

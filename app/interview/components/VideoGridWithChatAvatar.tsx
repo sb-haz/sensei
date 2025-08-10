@@ -176,6 +176,15 @@ export default function VideoGridWithChatAvatar({
             );
         };
 
+        window.__chatAvatarSpeakCompletion = async (message: string) => {
+            if (!chatAvatarService) {
+                throw new Error('Chat Avatar service not available');
+            }
+
+            console.log('Speaking completion message via avatar...');
+            await chatAvatarService.speakCompletionMessage(message);
+        };
+
         window.__chatAvatarStop = async () => {
             if (chatAvatarService) {
                 await chatAvatarService.stopSpeaking();
@@ -194,6 +203,7 @@ export default function VideoGridWithChatAvatar({
 
         return () => {
             delete window.__chatAvatarSendMessage;
+            delete window.__chatAvatarSpeakCompletion;
             delete window.__chatAvatarStop;
             delete window.__chatAvatarStatus;
         };

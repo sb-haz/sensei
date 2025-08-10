@@ -23,6 +23,24 @@ export async function POST(request: Request) {
             isEndOfInterview
         });
 
+        // Check if feedback already exists for this interview
+        if (interviewId) {
+            const supabase = await createClient();
+            const { data: existingInterview, error: checkError } = await supabase
+                .from('interviews')
+                .select('ai_feedback, overall_score')
+                .eq('id', interviewId)
+                .single();
+
+            if (!checkError && existingInterview && existingInterview.ai_feedback) {
+                console.log('Feedback already exists for interview:', interviewId);
+                return NextResponse.json({ 
+                    feedback: existingInterview.ai_feedback,
+                    message: 'Feedback already exists' 
+                });
+            }
+        }
+
         // System prompt for generating feedback
         const systemPrompt = `You are a technical interview assessor providing comprehensive feedback.
 

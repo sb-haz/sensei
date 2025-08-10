@@ -557,6 +557,21 @@ export class AzureChatAvatarService {
         }
     }
 
+    // Public method to speak completion messages directly without OpenAI API
+    public async speakCompletionMessage(message: string): Promise<void> {
+        console.log('🎤 Speaking completion message directly via Azure Avatar...', message.substring(0, 50) + '...');
+        
+        // Update current message for display
+        this.currentMessage = message;
+        this.callbacks.onMessageUpdate(message);
+        this.callbacks.onMessageComplete(message);
+        
+        // Speak the message directly
+        await this.speak(message);
+        
+        console.log('✅ Completion message spoken successfully');
+    }
+
     private async speak(text: string): Promise<void> {
         if (!text.trim()) return;
 

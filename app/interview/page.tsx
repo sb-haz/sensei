@@ -61,6 +61,8 @@ export default function InterviewPage() {
         startTime: new Date()
     });
     const [userFullName, setUserFullName] = useState<string>('');
+    const [showCompletionDialog, setShowCompletionDialog] = useState(false);
+    const [isInterviewCompleting, setIsInterviewCompleting] = useState(false);
 
     // Load user's full name for personalization
     useEffect(() => {
@@ -130,16 +132,266 @@ export default function InterviewPage() {
 
     // Update elapsed time
     useEffect(() => {
+        if (showCompletionDialog || isInterviewCompleting) {
+            // Stop timer when interview is completing or completed
+            return;
+        }
+
         const timer = setInterval(() => {
             const now = new Date();
             const diff = Math.floor((now.getTime() - interview.startTime.getTime()) / 1000);
             const minutes = Math.floor(diff / 60).toString().padStart(2, '0');
             const seconds = (diff % 60).toString().padStart(2, '0');
             setElapsedTime(`${minutes}:${seconds}`);
+            
+            // Check if duration limit is reached
+            if (template?.duration_minutes) {
+                const elapsedMinutes = Math.floor(diff / 60);
+                if (elapsedMinutes >= template.duration_minutes && !isInterviewCompleting) {
+                    console.log(`⏰ Duration limit reached: ${elapsedMinutes}/${template.duration_minutes} minutes`);
+                    handleInterviewCompletion('duration');
+                }
+            }
         }, 1000);
 
         return () => clearInterval(timer);
-    }, [interview.startTime]);
+    }, [interview.startTime, template?.duration_minutes, isInterviewCompleting, showCompletionDialog]);
+
+    // Check if interview should end based on questions or duration
+    const shouldEndInterview = (questionCount: number): { shouldEnd: boolean; reason: 'questions' | 'duration' | null } => {
+        const maxQuestions = template?.number_of_questions || 4;
+        const maxDuration = template?.duration_minutes || 60;
+        const elapsedMinutes = Math.floor((new Date().getTime() - interview.startTime.getTime()) / 60000);
+        
+        if (questionCount >= maxQuestions) {
+            return { shouldEnd: true, reason: 'questions' };
+        }
+        
+        if (elapsedMinutes >= maxDuration) {
+            return { shouldEnd: true, reason: 'duration' };
+        }
+        
+        return { shouldEnd: false, reason: null };
+    };
+
+    // Generate feedback in background without blocking UI
+    const generateFeedbackInBackground = async (interviewId: number, durationMinutes: number) => {
+        try {
+            console.log('🤖 Background feedback generation started for interview:', interviewId);
+            
+            // Add a small delay to ensure interview completion is saved first
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            const feedbackResponse = await fetch('/api/generate-feedback', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    userDetails: { name: 'User' },
+                    interviewHistory: interview.questions,
+                    template: {
+                        role: template?.role || 'Software Engineer',
+                        level: template?.level || 'Mid-level',
+                        company: template?.company || 'Tech Company'
+                    },
+                    interviewId: interviewId,
+                    isEndOfInterview: true
+                }),
+            });
+
+            if (!feedbackResponse.ok) {
+                console.error('❌ Background feedback generation failed:', feedbackResponse.status);
+                const errorText = await feedbackResponse.text();
+                console.error('❌ Error details:', errorText);
+                
+                // Try once more after a delay
+                console.log('🔄 Retrying feedback generation in 5 seconds...');
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                
+                const retryResponse = await fetch('/api/generate-feedback', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        userDetails: { name: 'User' },
+                        interviewHistory: interview.questions,
+                        template: {
+                            role: template?.role || 'Software Engineer',
+                            level: template?.level || 'Mid-level',
+                            company: template?.company || 'Tech Company'
+                        },
+                        interviewId: interviewId,
+                        isEndOfInterview: true
+                    }),
+                });
+                
+                if (!retryResponse.ok) {
+                    const retryErrorText = await retryResponse.text();
+                    console.error('❌ Retry also failed:', retryResponse.status, retryErrorText);
+                    return;
+                }
+                
+                const retryFeedbackData = await retryResponse.json();
+                console.log('✅ Background feedback generated successfully on retry:', retryFeedbackData);
+            } else {
+                const feedbackData = await feedbackResponse.json();
+                console.log('✅ Background feedback generated successfully:', feedbackData);
+            }
+        } catch (feedbackError) {
+            console.error('❌ Error in background feedback generation:', feedbackError);
+            // Background process - don't throw error, just log it
+            console.log('💡 Feedback can be regenerated later from the dashboard');
+        }
+    };
+
+    // Handle interview completion with AI conclusion
+    const handleInterviewCompletion = async (reason: 'questions' | 'duration') => {
+        if (isInterviewCompleting) return; // Prevent multiple calls
+        
+        setIsInterviewCompleting(true);
+        setLoading(true);
+        
+        try {
+            console.log(`🎯 Interview completing due to: ${reason}`);
+            
+            // Create completion message
+            const completionMessage = reason === 'questions' 
+                ? `Thank you for completing all ${template?.number_of_questions || 4} questions! Your interview is now finished. Your results will be available shortly in your dashboard. Great job!`
+                : `Thank you! We've reached the ${template?.duration_minutes || 60}-minute time limit for this interview. Your responses have been recorded and your results will be available shortly in your dashboard. Well done!`;
+            
+            setCurrentQuestion(completionMessage);
+            
+            // Update interview completion in database
+            if (interview.id) {
+                console.log('💾 Updating interview completion status in database...');
+                const supabase = createClient();
+                
+                // Calculate total duration in minutes using same logic as timer
+                const now = new Date();
+                const diffSeconds = Math.floor((now.getTime() - interview.startTime.getTime()) / 1000);
+                const durationMinutes = Math.floor(diffSeconds / 60);
+                
+                const { error: updateError } = await supabase
+                    .from('interviews')
+                    .update({
+                        status: 'completed',
+                        completed_at: new Date().toISOString(),
+                        total_duration_minutes: durationMinutes
+                    })
+                    .eq('id', interview.id);
+
+                if (updateError) {
+                    console.error('❌ Failed to update interview completion:', updateError);
+                } else {
+                    console.log('✅ Interview completion updated successfully:', {
+                        interviewId: interview.id,
+                        durationMinutes,
+                        totalQuestions: interview.questions.length,
+                        completionReason: reason
+                    });
+                }
+
+                // Generate feedback asynchronously in the background
+                console.log('🤖 Starting background feedback generation...');
+                // Don't await this - let it run in background
+                generateFeedbackInBackground(interview.id, durationMinutes);
+            } else {
+                console.warn('⚠️ No interview ID available for database update');
+            }
+            
+            // Have the Azure AI avatar speak the completion message
+            try {
+                if (window.__chatAvatarSpeakCompletion) {
+                    console.log('🎤 Azure AI avatar speaking completion message...');
+                    
+                    // Use the dedicated completion speaking function
+                    await new Promise<void>((resolve) => {
+                        setIsInterviewerSpeaking(true);
+                        
+                        // Use a timeout to resolve after a reasonable time
+                        const timeout = setTimeout(() => {
+                            setIsInterviewerSpeaking(false);
+                            resolve();
+                        }, Math.max(3000, completionMessage.length * 80)); // Estimate based on message length
+                        
+                        // Send completion message to avatar for direct speech
+                        window.__chatAvatarSpeakCompletion!(completionMessage).then(() => {
+                            clearTimeout(timeout);
+                            setIsInterviewerSpeaking(false);
+                            resolve();
+                        }).catch((error) => {
+                            console.error('Error with chat avatar completion speech:', error);
+                            clearTimeout(timeout);
+                            setIsInterviewerSpeaking(false);
+                            resolve();
+                        });
+                    });
+                    
+                    console.log('✅ Azure AI avatar completion message spoken');
+                } else if (window.__chatAvatarSendMessage) {
+                    console.log('🎤 Using fallback chat avatar method...');
+                    // Fallback to sending message through chat system
+                    await new Promise<void>((resolve) => {
+                        setIsInterviewerSpeaking(true);
+                        const timeout = setTimeout(() => {
+                            setIsInterviewerSpeaking(false);
+                            resolve();
+                        }, Math.max(3000, completionMessage.length * 80));
+                        
+                        window.__chatAvatarSendMessage!(completionMessage).then(() => {
+                            clearTimeout(timeout);
+                            setIsInterviewerSpeaking(false);
+                            resolve();
+                        }).catch((error) => {
+                            console.error('Error with fallback chat avatar speech:', error);
+                            clearTimeout(timeout);
+                            setIsInterviewerSpeaking(false);
+                            resolve();
+                        });
+                    });
+                } else {
+                    console.warn('⚠️ Chat avatar not available, using browser speech synthesis');
+                    // Fallback to browser speech synthesis only if chat avatar is not available
+                    await new Promise<void>((resolve) => {
+                        setIsInterviewerSpeaking(true);
+                        const utterance = new SpeechSynthesisUtterance(completionMessage);
+                        utterance.rate = 0.9;
+                        utterance.onend = () => {
+                            setIsInterviewerSpeaking(false);
+                            resolve();
+                        };
+                        window.speechSynthesis.cancel();
+                        window.speechSynthesis.speak(utterance);
+                    });
+                }
+            } catch (error) {
+                console.error('Error speaking completion message:', error);
+                // Even if speech fails, continue with completion
+                setIsInterviewerSpeaking(false);
+            }
+            
+            // Wait a moment after speech completes
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Show completion dialog and ensure timer stops
+            setShowCompletionDialog(true);
+            setLoading(false);
+            
+            console.log('✅ Interview completion process finished', {
+                questionsAnswered: interview.questions.length,
+                interviewId: interview.id,
+                completionReason: reason
+            });
+            
+        } catch (error) {
+            console.error('Error during interview completion:', error);
+            setLoading(false);
+            // Still show completion dialog even if speech fails
+            setShowCompletionDialog(true);
+        }
+    };
 
     // Load template data
     useEffect(() => {
@@ -226,8 +478,9 @@ export default function InterviewPage() {
 
     // Fetch next question using Azure Chat Avatar
     const fetchNextQuestion = async (prevQuestions = interview.questions) => {
-        if (prevQuestions.length >= (template?.number_of_questions || 4)) {
-            await handleEndInterview();
+        const { shouldEnd, reason } = shouldEndInterview(prevQuestions.length);
+        if (shouldEnd && reason) {
+            await handleInterviewCompletion(reason);
             return true;
         }
 
@@ -241,8 +494,9 @@ export default function InterviewPage() {
                 template: template
             });
 
-            // First, create an interview record if we don't have one yet
+            // Create an interview record if we don't have one yet (for first question)
             if (!interview.id && template?.id) {
+                console.log('🆕 Creating interview record for first question...');
                 const supabase = createClient();
                 const { data: { user }, error: userError } = await supabase.auth.getUser();
 
@@ -257,7 +511,7 @@ export default function InterviewPage() {
                         template_id: template.id,
                         user_id: user.id,
                         status: 'in_progress',
-                        started_at: interview.startTime
+                        started_at: interview.startTime.toISOString()
                     })
                     .select()
                     .single();
@@ -266,6 +520,17 @@ export default function InterviewPage() {
                     console.error('Failed to create interview:', interviewError);
                     throw new Error('Failed to create interview record');
                 }
+
+                if (!interviewData) {
+                    console.error('No interview data returned after creation');
+                    throw new Error('Interview creation returned no data');
+                }
+
+                console.log('✅ Interview created successfully:', {
+                    interviewId: interviewData.id,
+                    templateId: template.id,
+                    startTime: interview.startTime.toISOString()
+                });
 
                 setInterview(prev => ({ ...prev, id: interviewData.id }));
             }
@@ -296,7 +561,7 @@ export default function InterviewPage() {
 
     // Handle answer submission
     const handleSubmitAnswer = async () => {
-        if (!answer.trim() || loading) return;
+        if (!answer.trim() || loading || isInterviewCompleting) return;
 
         setLoading(true);
         transcriptionService.current.stopTranscription();
@@ -306,8 +571,52 @@ export default function InterviewPage() {
             console.log('Saving answer and getting next question via chat avatar...', {
                 currentQuestion,
                 answer: answer.trim(),
-                interviewId: interview.id
+                interviewId: interview.id,
+                questionNumber: interview.questions.length + 1
             });
+
+            // Ensure interview record exists before saving answer
+            let interviewId = interview.id;
+            if (!interviewId && template?.id) {
+                console.log('🆕 Creating interview record before saving answer...');
+                const supabase = createClient();
+                const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+                if (userError || !user) {
+                    console.error('Auth error:', userError);
+                    throw new Error('User not authenticated');
+                }
+
+                const { data: interviewData, error: interviewError } = await supabase
+                    .from('interviews')
+                    .insert({
+                        template_id: template.id,
+                        user_id: user.id,
+                        status: 'in_progress',
+                        started_at: interview.startTime.toISOString()
+                    })
+                    .select()
+                    .single();
+
+                if (interviewError) {
+                    console.error('Failed to create interview:', interviewError);
+                    throw new Error('Failed to create interview record');
+                }
+
+                if (!interviewData) {
+                    console.error('No interview data returned after creation');
+                    throw new Error('Interview creation returned no data');
+                }
+
+                console.log('✅ Interview created successfully:', {
+                    interviewId: interviewData.id,
+                    templateId: template.id,
+                    startTime: interview.startTime.toISOString()
+                });
+
+                interviewId = interviewData.id;
+                setInterview(prev => ({ ...prev, id: interviewData.id }));
+            }
 
             // First update the interview state with the new Q&A
             const newQuestions = [...interview.questions, {
@@ -328,34 +637,46 @@ export default function InterviewPage() {
                 return newState;
             });
 
-            if (interview.id) {
+            if (interviewId) {
                 // Save the answer to Supabase answers table
                 const supabase = createClient();
+                const answerData = {
+                    interview_id: interviewId,
+                    question_number: interview.questions.length + 1, // Fix: Should be +1 to start from 1, not 0
+                    question_text: currentQuestion,
+                    user_answer: answer.trim()
+                };
+                
+                console.log('💾 Saving answer to database:', answerData);
+                
                 const { error: answerError } = await supabase
                     .from('answers')
-                    .insert({
-                        interview_id: interview.id,
-                        question_number: interview.questions.length,
-                        question_text: currentQuestion,
-                        user_answer: answer.trim()
-                    });
+                    .insert(answerData);
 
                 if (answerError) {
-                    console.error('Failed to save answer:', answerError);
+                    console.error('❌ Failed to save answer:', answerError);
+                    console.error('❌ Answer data that failed:', answerData);
+                    console.error('❌ Database error details:', answerError.message, answerError.code);
                 } else {
-                    console.log('Successfully saved answer to database');
+                    console.log('✅ Successfully saved answer to database', {
+                        question_number: answerData.question_number,
+                        interview_id: answerData.interview_id,
+                        question_text: answerData.question_text.substring(0, 50) + '...',
+                        answer_length: answerData.user_answer.length
+                    });
                 }
             } else {
-                console.warn('No interview ID available, answer only saved in local state');
+                console.warn('❌ No interview ID available, answer only saved in local state');
             }
 
             // Clear current state
             setCurrentQuestion('The interviewer is processing your answer...');
             setAnswer('');
 
-            // Check if this is the last question
-            if (newQuestions.length >= (template?.number_of_questions || 4)) {
-                await handleEndInterview();
+            // Check if this is the last question or time limit reached
+            const { shouldEnd, reason } = shouldEndInterview(newQuestions.length);
+            if (shouldEnd && reason) {
+                await handleInterviewCompletion(reason);
                 return;
             }
 
@@ -380,6 +701,7 @@ export default function InterviewPage() {
     const handleEndInterview = async () => {
         try {
             setLoading(true);
+            setShowCompletionDialog(false); // Hide completion dialog if showing
 
             // Stop chat avatar speaking if active
             try {
@@ -396,56 +718,33 @@ export default function InterviewPage() {
             if (interview.id) {
                 // Update interview status
                 const supabase = createClient();
+                
+                // Calculate duration properly
+                const durationMinutes = Math.floor((new Date().getTime() - interview.startTime.getTime()) / 60000);
+                
                 const { error: updateError } = await supabase
                     .from('interviews')
                     .update({
                         status: 'completed',
                         completed_at: new Date().toISOString(),
-                        total_duration_minutes: Math.floor((new Date().getTime() - interview.startTime.getTime()) / 60000)
+                        total_duration_minutes: durationMinutes
                     })
                     .eq('id', interview.id);
 
                 if (updateError) {
                     console.error('Failed to update interview status:', updateError);
+                } else {
+                    console.log('Successfully updated interview status', {
+                        interview_id: interview.id,
+                        duration_minutes: durationMinutes,
+                        questions_count: interview.questions.length
+                    });
                 }
 
-                // Generate final comprehensive feedback
-                console.log('Preparing final feedback with template:', {
-                    template
-                });
-
-                const finalFeedbackData = {
-                    userDetails: {
-                        name: userFullName || 'there', // Use full name if available, otherwise default greeting
-                        job_info: {
-                            title: template?.role || 'Software Engineer',
-                            level: template?.level || 'Mid-Level',
-                            company: template?.company || 'Company'
-                        }
-                    },
-                    interviewHistory: interview.questions,
-                    template: template,
-                    interviewId: interview.id,
-                    isEndOfInterview: true
-                };
-
-                console.log('Sending final feedback request:', finalFeedbackData);
-
-                const feedbackResponse = await fetch('/api/generate-feedback', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(finalFeedbackData),
-                });
-
-                if (!feedbackResponse.ok) {
-                    throw new Error('Failed to generate feedback');
-                }
-
-                const feedback = await feedbackResponse.json();
-                console.log('Feedback generated:', feedback);
-                // Note: feedback display logic would be handled elsewhere
+                // Generate final comprehensive feedback in background
+                console.log('🤖 Starting background feedback generation for manual end...');
+                // Don't await this - let it run in background  
+                generateFeedbackInBackground(interview.id, durationMinutes);
             }
 
             // Stop all media tracks
@@ -453,7 +752,7 @@ export default function InterviewPage() {
                 stream.getTracks().forEach(track => track.stop());
             }
 
-            // Navigate to dashboard
+            // Navigate to dashboard immediately without waiting for feedback
             router.push('/dashboard');
         } catch (error) {
             console.error('Error ending interview:', error);
@@ -639,7 +938,11 @@ export default function InterviewPage() {
                     onRepeatQuestion={handleRepeatQuestion}
                     onSkipQuestion={fetchNextQuestion}
                     onMuteToggle={(muted) => setIsMicEnabled(!muted)}
-                    onEndInterview={handleEndInterview}
+                    onEndInterview={() => {
+                        if (!isInterviewCompleting) {
+                            setShowEndConfirm(true);
+                        }
+                    }}
                 />
             </div>
 
@@ -664,6 +967,72 @@ export default function InterviewPage() {
                                 >
                                     {t('interview.endInterview')}
                                 </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showCompletionDialog && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
+                    <div className="bg-card border border-border rounded-2xl p-8 max-w-md w-full">
+                        <div className="space-y-6 text-center">
+                            <div className="space-y-4">
+                                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                                    <span className="text-4xl">🎉</span>
+                                </div>
+                                <div>
+                                    <h3 className="text-2xl font-bold text-foreground mb-2">Interview Complete!</h3>
+                                    <p className="text-muted-foreground mb-2">
+                                        Great job! You've completed your {template?.topic || 'technical'} interview
+                                        {template?.company ? ` for ${template.company}` : ''}.
+                                    </p>
+                                    <p className="text-sm text-blue-600 bg-blue-50 rounded-lg p-2">
+                                        📊 Your detailed feedback is being generated and will be available in your dashboard shortly.
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            <div className="bg-muted/30 rounded-xl p-4 space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-sm text-muted-foreground">Questions Answered:</span>
+                                    <span className="font-medium">{interview.questions.length}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-sm text-muted-foreground">Duration:</span>
+                                    <span className="font-medium">{elapsedTime}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-sm text-muted-foreground">Position:</span>
+                                    <span className="font-medium">{template?.role || 'Software Engineer'}</span>
+                                </div>
+                            </div>
+                            
+                            <div className="space-y-3">
+                                <p className="text-sm text-muted-foreground">
+                                    Your responses are being analyzed. Detailed feedback will be available in your dashboard shortly.
+                                </p>
+                                
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => {
+                                            setShowCompletionDialog(false);
+                                            handleEndInterview();
+                                        }}
+                                        className="flex-1 bg-primary text-primary-foreground px-6 py-3 rounded-full font-medium hover:bg-primary/90 transition-all duration-200"
+                                    >
+                                        View Results
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setShowCompletionDialog(false);
+                                            router.push('/dashboard');
+                                        }}
+                                        className="flex-1 border border-border text-foreground px-6 py-3 rounded-full font-medium hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                                    >
+                                        Dashboard
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
